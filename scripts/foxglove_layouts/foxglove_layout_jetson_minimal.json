@@ -1,0 +1,139 @@
+{
+  "configById": {
+    "Image!infra1": {
+      "cameraState": {
+        "distance": 20,
+        "perspective": true,
+        "phi": 60,
+        "target": [0, 0, 0],
+        "targetOffset": [0, 0, 0],
+        "targetOrientation": [0, 0, 0, 1],
+        "thetaOffset": 45,
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "scene": {},
+      "transforms": {},
+      "topics": {},
+      "layers": {},
+      "publish": {
+        "type": "point",
+        "poseTopic": "/move_base_simple/goal",
+        "pointTopic": "/clicked_point",
+        "poseEstimateTopic": "/initialpose",
+        "poseEstimateXDeviation": 0.5,
+        "poseEstimateYDeviation": 0.5,
+        "poseEstimateThetaDeviation": 0.26179939
+      },
+      "imageMode": {
+        "imageTopic": "/camera/camera/infra1/image_rect_raw",
+        "calibrationTopic": "/camera/camera/infra1/camera_info"
+      }
+    },
+    "3D!main": {
+      "layers": {
+        "grid-layer": {
+          "visible": true,
+          "frameLocked": true,
+          "label": "Grid",
+          "instanceId": "grid-layer",
+          "layerId": "foxglove.Grid",
+          "size": 10,
+          "divisions": 10,
+          "lineWidth": 1,
+          "color": "#248eff",
+          "position": [0, 0, 0],
+          "rotation": [0, 0, 0],
+          "order": 1
+        }
+      },
+      "cameraState": {
+        "perspective": true,
+        "distance": 8.5,
+        "phi": 64,
+        "thetaOffset": 70,
+        "targetOffset": [1.2, 0.5, 0],
+        "target": [0, 0, 0],
+        "targetOrientation": [0, 0, 0, 1],
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "followTf": "odom",
+      "scene": {
+        "meshUpAxis": "z_up",
+        "transforms": {
+          "labelSize": 0.1
+        }
+      },
+      "transforms": {
+        "frame:base_link": {"visible": true},
+        "frame:laser": {"visible": true},
+        "frame:camera_link": {"visible": true},
+        "frame:camera_depth_frame": {"visible": false}
+      },
+      "topics": {
+        "/robot_description": {"visible": true},
+        "/scan": {"visible": true},
+        "/visual_slam/tracking/vo_path": {
+          "visible": true,
+          "lineWidth": 0.05,
+          "gradient": ["#17c426ff", "#17c426ff"]
+        },
+        "/visual_slam/tracking/slam_path": {
+          "visible": true,
+          "lineWidth": 0.05,
+          "gradient": ["#ff9f1cff", "#ff9f1cff"]
+        },
+        "/visual_slam/vis/observations_cloud": {
+          "visible": true,
+          "colorField": "rgb",
+          "colorMode": "rgb",
+          "colorMap": "turbo",
+          "pointSize": 3
+        },
+        "/visual_slam/vis/landmarks_cloud": {"visible": false},
+        "/camera/camera/infra1/image_rect_raw": {
+          "visible": true,
+          "frameLocked": true,
+          "cameraInfoTopic": "/camera/camera/infra1/camera_info",
+          "distance": 1,
+          "planarProjectionFactor": 0,
+          "color": "#ffffff"
+        },
+        "/camera/camera/infra2/image_rect_raw": {
+          "visible": false,
+          "frameLocked": true,
+          "cameraInfoTopic": "/camera/camera/infra2/camera_info",
+          "distance": 1,
+          "planarProjectionFactor": 0,
+          "color": "#ffffff"
+        }
+      },
+      "publish": {
+        "type": "pose",
+        "poseTopic": "/goal_pose",
+        "pointTopic": "/clicked_point",
+        "poseEstimateTopic": "/initialpose",
+        "poseEstimateXDeviation": 0.5,
+        "poseEstimateYDeviation": 0.5,
+        "poseEstimateThetaDeviation": 0.26179939
+      },
+      "imageMode": {}
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "playbackConfig": {
+    "speed": 1
+  },
+  "layout": {
+    "direction": "row",
+    "first": "Image!infra1",
+    "second": "3D!main",
+    "splitPercentage": 35
+  }
+}

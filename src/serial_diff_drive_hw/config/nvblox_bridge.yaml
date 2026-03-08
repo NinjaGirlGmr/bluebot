@@ -1,0 +1,10 @@
+/**:
+  ros__parameters:
+    # Keep nvblox lightweight for our existing stack defaults.
+    use_lidar: false
+    use_color: false
+    map_clearing_radius_m: 7.0
+    map_clearing_frame_id: "base_link"
+    input_qos: "SENSOR_DATA"
+    esdf_slice_bounds_visualization_attachment_frame_id: "base_link"
+    workspace_height_bounds_visualization_attachment_frame_id: "base_link"

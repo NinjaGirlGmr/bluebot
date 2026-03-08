@@ -1,0 +1,19 @@
+flowchart TD
+  A["bluebot start-map"] --> B["start_stack()"]
+  B --> C["ros2_serial_diff_drive_bridge\nodom_topic=/odom_raw, publish_tf=false"]
+  B --> D["serial_diff_drive_hw bringup\ncontroller_manager + controllers"]
+  B --> E["robot_state_publisher"]
+  B --> F["Lidar + static tf\n/frame_id=laser, /scan"]
+  B --> G["IMU node\n/imu/data_raw, /imu/orientation"]
+  B --> H["RealSense camera"]
+  B --> I["Isaac ROS Visual SLAM\n(direct or NITROS)"]
+  B --> J["teleop_twist_joy\n/joy -> /cmd_vel"]
+  B --> K["Foxglove Bridge"]
+  B --> L["State Estimation\nrobot_localization EKF"]
+  L --> |"/odometry/filtered -> /odom"| N["Fused odom for Nav2 inputs"]
+
+  B --> M["mapping_job.launch.py\n(slam:=False)"]
+  M --> O["slam_toolbox (mapping mode)"]
+  M --> P["drop_detector_node"]
+  M --> Q["cmd_vel_safety_gate\n(/cmd_vel_safe -> /cmd_vel)"]
+  Q --> C
