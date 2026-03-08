@@ -1,3 +1,7 @@
 build/
 install/
 log/
+*.log
+nohup.out
+*.pyc
+scripts/__pycache__/
