@@ -37,3 +37,6 @@
 [submodule "src/lidar_safety"]
 	path = src/lidar_safety
 	url = git@github.com:NinjaGirlGmr/ros_lidar_safety.git
+[submodule "src/serial_diff_drive_hw_cpp"]
+	path = src/serial_diff_drive_hw_cpp
+	url = git@github.com:NinjaGirlGmr/serial_diff_drive_hw_cpp.git
