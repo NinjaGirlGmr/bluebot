@@ -40,3 +40,6 @@
 [submodule "src/serial_diff_drive_hw_cpp"]
 	path = src/serial_diff_drive_hw_cpp
 	url = git@github.com:NinjaGirlGmr/serial_diff_drive_hw_cpp.git
+[submodule "src/yb_a471_driver"]
+	path = src/yb_a471_driver
+	url = git@github.com:NinjaGirlGmr/yb_a471_driver.git
