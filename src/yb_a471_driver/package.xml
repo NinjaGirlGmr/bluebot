@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>yb_a471_driver</name>
+  <version>0.1.0</version>
+  <description>Recreated IMU bridge driver for Bluebot stack.</description>
+  <maintainer email="you@example.com">hailey</maintainer>
+  <license>TODO: License declaration</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <depend>rclpy</depend>
+  <depend>sensor_msgs</depend>
+
+  <exec_depend>python3</exec_depend>
+
+  <test_depend>pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
