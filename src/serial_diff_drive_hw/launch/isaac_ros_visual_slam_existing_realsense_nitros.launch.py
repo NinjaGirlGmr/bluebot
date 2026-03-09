@@ -57,9 +57,9 @@ def generate_launch_description():
             # Avoid TF conflicts with wheel odometry and Nav2/SLAM map localization.
             'publish_odom_to_base_tf': False,
             'publish_map_to_odom_tf': False,
-            'enable_slam_visualization': True,
-            'enable_landmarks_view': True,
-            'enable_observations_view': True,
+            'enable_slam_visualization': False,
+            'enable_landmarks_view': False,
+            'enable_observations_view': False,
             'camera_optical_frames': [
                 'camera_infra1_optical_frame',
                 'camera_infra2_optical_frame',

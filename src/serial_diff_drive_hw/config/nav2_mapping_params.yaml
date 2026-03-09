@@ -6,16 +6,21 @@ slam_toolbox:
     map_frame: map
     base_frame: base_link
     scan_topic: /scan
-    map_update_interval: 2.0
+    map_update_interval: 5.0
+    scan_buffer_size: 4
+    scan_buffer_maximum_scan_distance: 4.0
     resolution: 0.05
     # Keep SLAM compute bounded to avoid scan backlog and stale-timestamp TF lookups.
     max_laser_range: 8.0
-    minimum_time_interval: 0.25
+    minimum_time_interval: 0.40
     transform_publish_period: 0.02
     tf_buffer_duration: 180.0
     use_scan_matching: true
     use_scan_barycenter: true
-    throttle_scans: 2
+    throttle_scans: 3
+    minimum_travel_distance: 0.25
+    minimum_travel_heading: 0.25
+    transform_timeout: 0.5
 
 map_saver:
   ros__parameters:

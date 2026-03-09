@@ -12,14 +12,18 @@ MAP_SAVE_TIMEOUT_SEC="${MAP_SAVE_TIMEOUT_SEC:-15.0}"
 MAP_OCCUPIED_THRESH="${MAP_OCCUPIED_THRESH:-0.65}"
 MAP_FREE_THRESH="${MAP_FREE_THRESH:-0.25}"
 MAP_IMAGE_FORMAT="${MAP_IMAGE_FORMAT:-pgm}"
+LIDAR_SCAN_FREQUENCY="${LIDAR_SCAN_FREQUENCY:-6.0}"
+LIDAR_ANGLE_COMPENSATE="${LIDAR_ANGLE_COMPENSATE:-false}"
+LIDAR_SCAN_MODE="${LIDAR_SCAN_MODE:-}"
 NAV2_USE_SIM_TIME="${NAV2_USE_SIM_TIME:-false}"
 NAV2_PARAMS_FILE="${NAV2_PARAMS_FILE:-/ssd/ros2_ws/src/serial_diff_drive_hw/config/nav2_navigation_params.yaml}"
 NAV2_MAP_EXPLORE_PARAMS_FILE="${NAV2_MAP_EXPLORE_PARAMS_FILE:-/ssd/ros2_ws/src/serial_diff_drive_hw/config/nav2_map_explore_params.yaml}"
 NAV2_AUTOSTART="${NAV2_AUTOSTART:-true}"
-NAV2_USE_COMPOSITION="${NAV2_USE_COMPOSITION:-False}"
+NAV2_USE_COMPOSITION="${NAV2_USE_COMPOSITION:-__AUTO__}"
 NAV2_USE_RESPAWN="${NAV2_USE_RESPAWN:-False}"
-NAV2_LOG_LEVEL="${NAV2_LOG_LEVEL:-info}"
-FOXGLOVE_WAYPOINT_BRIDGE="${FOXGLOVE_WAYPOINT_BRIDGE:-true}"
+NAV2_LOG_LEVEL="${NAV2_LOG_LEVEL:-warn}"
+FOXGLOVE_BRIDGE_ENABLED="${FOXGLOVE_BRIDGE_ENABLED:-false}"
+FOXGLOVE_WAYPOINT_BRIDGE="${FOXGLOVE_WAYPOINT_BRIDGE:-false}"
 FOXGLOVE_WAYPOINT_TOPIC="${FOXGLOVE_WAYPOINT_TOPIC:-/foxglove/waypoints}"
 FOXGLOVE_WAYPOINT_FRAME="${FOXGLOVE_WAYPOINT_FRAME:-map}"
 FOXGLOVE_WAYPOINT_ACTION_NAME="${FOXGLOVE_WAYPOINT_ACTION_NAME:-/navigate_through_poses}"
@@ -77,6 +81,30 @@ is_jetson_platform() {
   return 1
 }
 
+filter_colon_paths() {
+  local input="${1:-}"
+  local exclude_regex="${2:-}"
+  local out=""
+  local part
+  local IFS=':'
+  local -a parts=()
+
+  read -r -a parts <<< "$input"
+  for part in "${parts[@]}"; do
+    [[ -z "$part" ]] && continue
+    if [[ -n "$exclude_regex" ]] && [[ "$part" =~ $exclude_regex ]]; then
+      continue
+    fi
+    if [[ -n "$out" ]]; then
+      out="${out}:$part"
+    else
+      out="$part"
+    fi
+  done
+
+  echo "$out"
+}
+
 if [[ -z "$VSLAM_MODE" ]]; then
   if is_jetson_platform; then
     VSLAM_MODE="nitros"
@@ -88,6 +116,46 @@ fi
 VSLAM_MODE="${VSLAM_MODE,,}"
 
 source_ros() {
+  setup_isaac_gxf_runtime() {
+    local ros_distro="${ROS_DISTRO:-humble}"
+    local path
+    local -a gxf_paths=()
+    local -a globbed=()
+    local pattern
+
+    gxf_paths+=(
+      "$ROS_WS/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/lib"
+      "/opt/ros/$ros_distro/share/isaac_ros_gxf/gxf/lib"
+    )
+
+    shopt -s nullglob
+    for pattern in \
+      "$ROS_WS/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/lib/"* \
+      "$ROS_WS/install"/gxf_isaac_*/share/gxf_isaac_*/gxf/lib \
+      "/opt/ros/$ros_distro/share/isaac_ros_gxf/gxf/lib/"* \
+      "/opt/ros/$ros_distro"/share/gxf_isaac_*/gxf/lib; do
+      globbed+=("$pattern")
+    done
+    shopt -u nullglob
+
+    gxf_paths+=("${globbed[@]}")
+
+    for path in "${gxf_paths[@]}"; do
+      [[ -d "$path" ]] || continue
+      case ":${LD_LIBRARY_PATH:-}:" in
+        *":$path:"*) ;;
+        *)
+          if [[ -n "${LD_LIBRARY_PATH:-}" ]]; then
+            LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:$path"
+          else
+            LD_LIBRARY_PATH="$path"
+          fi
+          ;;
+      esac
+    done
+    export LD_LIBRARY_PATH
+  }
+
   local had_nounset=0
   if [[ $- == *u* ]]; then
     had_nounset=1
@@ -95,6 +163,7 @@ source_ros() {
   fi
   source /opt/ros/${ROS_DISTRO:-humble}/setup.bash
   source "$ROS_WS/install/setup.bash"
+  setup_isaac_gxf_runtime
   if [[ $had_nounset -eq 1 ]]; then
     set -u
   fi
@@ -216,14 +285,20 @@ start_nvblox() {
 start_explore_lite() {
   local mode_name="$1"
   local enabled="${2:-$EXPLORE_LITE_ENABLED}"
+  local -a explore_cmd
   if ! is_true "$enabled"; then
     return 0
   fi
 
-  launch_bg "Explore Lite (${mode_name})" \
-    ros2 launch explore_lite explore.launch.py \
-      use_sim_time:="$EXPLORE_LITE_USE_SIM_TIME" \
-      namespace:="$EXPLORE_LITE_NAMESPACE"
+  explore_cmd=(
+    ros2 launch explore_lite explore.launch.py
+    "use_sim_time:=$EXPLORE_LITE_USE_SIM_TIME"
+  )
+  if [[ -n "$EXPLORE_LITE_NAMESPACE" ]]; then
+    explore_cmd+=("namespace:=$EXPLORE_LITE_NAMESPACE")
+  fi
+
+  launch_bg "Explore Lite (${mode_name})" "${explore_cmd[@]}"
 }
 
 cleanup_leaked_stack() {
@@ -288,8 +363,19 @@ start_stack() {
     ros2 launch serial_diff_drive_hw bringup.launch.py
   sleep 3
 
-  launch_bg "Lidar with TF" \
-    ros2 launch lidar_launch lidar_with_tf.launch.py serial_port:=/dev/lidar frame_id:=laser
+  local -a lidar_cmd
+  lidar_cmd=(
+    ros2 launch lidar_launch lidar_with_tf.launch.py
+    serial_port:=/dev/lidar
+    frame_id:=laser
+    "scan_frequency:=$LIDAR_SCAN_FREQUENCY"
+    "angle_compensate:=$LIDAR_ANGLE_COMPENSATE"
+  )
+  if [[ -n "$LIDAR_SCAN_MODE" ]]; then
+    lidar_cmd+=("scan_mode:=$LIDAR_SCAN_MODE")
+  fi
+
+  launch_bg "Lidar with TF" "${lidar_cmd[@]}"
   sleep 1
 
   launch_bg "IMU node" \
@@ -315,7 +401,7 @@ start_stack() {
       enable_gyro:=true \
       enable_accel:=true \
       unite_imu_method:=2 \
-      align_depth.enable:=true \
+      align_depth.enable:=false \
       pointcloud.enable:=false
   sleep 3
 
@@ -332,19 +418,41 @@ start_stack() {
     exit 1
   fi
 
+if [[ "$NAV2_USE_COMPOSITION" == "__AUTO__" ]]; then
+  if is_jetson_platform; then
+    NAV2_USE_COMPOSITION="True"
+  else
+    NAV2_USE_COMPOSITION="False"
+  fi
+  fi
+
+  local isaac_overlay_regex='^/ssd/ros2_ws/install/(isaac_ros_nitros($|_)|isaac_ros_gxf($|_)|gxf_isaac_|custom_nitros_|isaac_common)'
+  local vslam_ament_prefix
+  local vslam_cmake_prefix
+  local vslam_colcon_prefix
+  local vslam_ld_library_path
+
+  vslam_ament_prefix="$(filter_colon_paths "${AMENT_PREFIX_PATH:-}" "$isaac_overlay_regex")"
+  vslam_cmake_prefix="$(filter_colon_paths "${CMAKE_PREFIX_PATH:-}" "$isaac_overlay_regex")"
+  vslam_colcon_prefix="$(filter_colon_paths "${COLCON_PREFIX_PATH:-}" "$isaac_overlay_regex")"
+  vslam_ld_library_path="$(filter_colon_paths "${LD_LIBRARY_PATH:-}" "$isaac_overlay_regex")"
+
   launch_bg "Isaac ROS Visual SLAM (mode: $VSLAM_MODE)" \
-    ros2 launch "$vslam_launch_pkg" "$vslam_launch_file"
+    env \
+      AMENT_PREFIX_PATH="$vslam_ament_prefix" \
+      CMAKE_PREFIX_PATH="$vslam_cmake_prefix" \
+      COLCON_PREFIX_PATH="$vslam_colcon_prefix" \
+      LD_LIBRARY_PATH="$vslam_ld_library_path" \
+      ros2 launch "$vslam_launch_pkg" "$vslam_launch_file"
   sleep 2
 
-  launch_bg "Foxglove Bridge" \
-    ros2 launch foxglove_bridge foxglove_bridge_launch.xml port:=8765
-  sleep 1
-
-  if [[ "$job_mode" == "map-explore" ]]; then
-    start_nvblox true
-  else
-    start_nvblox
+  if is_true "$FOXGLOVE_BRIDGE_ENABLED"; then
+    launch_bg "Foxglove Bridge" \
+      ros2 launch foxglove_bridge foxglove_bridge_launch.xml port:=8765
+    sleep 1
   fi
+
+  start_nvblox
   sleep 1
 
   local teleop_linear_scale="0.5"
@@ -369,7 +477,9 @@ start_stack() {
   if [[ "$job_mode" == "map" ]]; then
     mkdir -p "$MAP_DIR"
     launch_bg "Nav2 mapping + perception safety job" \
-      ros2 launch serial_diff_drive_hw mapping_job.launch.py use_sim_time:=false
+      ros2 launch serial_diff_drive_hw mapping_job.launch.py \
+        use_sim_time:=false \
+        use_composition:="$NAV2_USE_COMPOSITION"
     sleep 2
     start_explore_lite "start-map"
   elif [[ "$job_mode" == "map-explore" ]]; then
@@ -394,7 +504,7 @@ start_stack() {
     echo "Maps will be saved under: $MAP_DIR"
     echo "Run '$0 save-map <name>' to save (example: $0 save-map office_a)."
   elif [[ "$job_mode" == "map-explore" ]]; then
-    echo "Map-and-explore mode active with nvblox local-costmap layers."
+    echo "Map-and-explore mode active with laser local-costmap layers."
     echo "Maps will be saved under: $MAP_DIR"
     echo "Run '$0 save-map <name>' to save (example: $0 save-map office_a)."
   fi

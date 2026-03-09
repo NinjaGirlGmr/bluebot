@@ -19,6 +19,7 @@ def generate_launch_description():
 
     use_sim_time = LaunchConfiguration("use_sim_time")
     params_file = LaunchConfiguration("params_file")
+    use_composition = LaunchConfiguration("use_composition")
     depth_topic = LaunchConfiguration("depth_topic")
     vslam_odom_topic = LaunchConfiguration("vslam_odom_topic")
     input_cmd_topic = LaunchConfiguration("input_cmd_topic")
@@ -27,6 +28,7 @@ def generate_launch_description():
 
     declare_use_sim_time = DeclareLaunchArgument("use_sim_time", default_value="false")
     declare_params_file = DeclareLaunchArgument("params_file", default_value=default_params)
+    declare_use_composition = DeclareLaunchArgument("use_composition", default_value="False")
     declare_depth_topic = DeclareLaunchArgument(
         "depth_topic", default_value="/camera/camera/aligned_depth_to_color/image_raw"
     )
@@ -44,6 +46,7 @@ def generate_launch_description():
         launch_arguments={
             "use_sim_time": use_sim_time,
             "params_file": params_file,
+            "use_composition": use_composition,
             "autostart": "True",
         }.items(),
     )
@@ -80,6 +83,7 @@ def generate_launch_description():
         [
             declare_use_sim_time,
             declare_params_file,
+            declare_use_composition,
             declare_depth_topic,
             declare_vslam_odom_topic,
             declare_input_cmd_topic,

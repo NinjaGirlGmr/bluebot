@@ -1,11 +1,11 @@
-ekf_filter_node:
+robot_localization_filter:
   ros__parameters:
-    frequency: 30.0
+    frequency: 25.0
     sensor_timeout: 0.2
     two_d_mode: true
     debug: false
     publish_tf: true
-    print_diagnostics: true
+    print_diagnostics: false
     use_control: false
     reset_on_time_jump: true
     transform_time_offset: 0.0
@@ -18,7 +18,7 @@ ekf_filter_node:
 
     # Wheel odom remains a raw source.
     odom0: /odom_raw
-    odom0_queue_size: 20
+    odom0_queue_size: 10
     odom0_differential: false
     odom0_relative: false
     odom0_config: [
@@ -31,7 +31,7 @@ ekf_filter_node:
 
     # IMU orientation only (remapped from yb_a471_driver into ROS frame).
     imu0: /imu/orientation
-    imu0_queue_size: 20
+    imu0_queue_size: 10
     imu0_differential: false
     imu0_relative: false
     imu0_remove_gravitational_acceleration: false
@@ -45,7 +45,7 @@ ekf_filter_node:
 
     # IMU angular velocity + linear acceleration.
     imu1: /imu/data_raw
-    imu1_queue_size: 20
+    imu1_queue_size: 10
     imu1_differential: false
     imu1_relative: false
     imu1_remove_gravitational_acceleration: true
