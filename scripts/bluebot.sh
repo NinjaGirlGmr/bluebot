@@ -22,6 +22,25 @@ NAV2_AUTOSTART="${NAV2_AUTOSTART:-true}"
 NAV2_USE_COMPOSITION="${NAV2_USE_COMPOSITION:-__AUTO__}"
 NAV2_USE_RESPAWN="${NAV2_USE_RESPAWN:-False}"
 NAV2_LOG_LEVEL="${NAV2_LOG_LEVEL:-warn}"
+NAV2_READY_TIMEOUT_SEC="${NAV2_READY_TIMEOUT_SEC:-60}"
+NAV2_READY_CHECK_INTERVAL_SEC="${NAV2_READY_CHECK_INTERVAL_SEC:-1}"
+NAV2_STARTUP_RETRY_SEC="${NAV2_STARTUP_RETRY_SEC:-5}"
+NAV2_STARTUP_GRACE_SEC="${NAV2_STARTUP_GRACE_SEC:-20}"
+REALSENSE_LIGHT_MODE_FOR_MAP="${REALSENSE_LIGHT_MODE_FOR_MAP:-true}"
+REALSENSE_ENABLE_INFRA1="${REALSENSE_ENABLE_INFRA1:-true}"
+REALSENSE_ENABLE_INFRA2="${REALSENSE_ENABLE_INFRA2:-true}"
+REALSENSE_ENABLE_GYRO="${REALSENSE_ENABLE_GYRO:-true}"
+REALSENSE_ENABLE_ACCEL="${REALSENSE_ENABLE_ACCEL:-true}"
+REALSENSE_ENABLE_COLOR="${REALSENSE_ENABLE_COLOR:-true}"
+REALSENSE_ENABLE_DEPTH="${REALSENSE_ENABLE_DEPTH:-true}"
+REALSENSE_INFRA_PROFILE="${REALSENSE_INFRA_PROFILE:-640x480x30}"
+REALSENSE_DEPTH_PROFILE="${REALSENSE_DEPTH_PROFILE:-640x480x30}"
+REALSENSE_COLOR_PROFILE="${REALSENSE_COLOR_PROFILE:-640x480x30}"
+REALSENSE_ENABLE_COLOR_LIGHT="${REALSENSE_ENABLE_COLOR_LIGHT:-false}"
+REALSENSE_ENABLE_DEPTH_LIGHT="${REALSENSE_ENABLE_DEPTH_LIGHT:-false}"
+REALSENSE_INFRA_PROFILE_LIGHT="${REALSENSE_INFRA_PROFILE_LIGHT:-640x480x15}"
+REALSENSE_DEPTH_PROFILE_LIGHT="${REALSENSE_DEPTH_PROFILE_LIGHT:-640x480x15}"
+REALSENSE_COLOR_PROFILE_LIGHT="${REALSENSE_COLOR_PROFILE_LIGHT:-640x480x15}"
 FOXGLOVE_BRIDGE_ENABLED="${FOXGLOVE_BRIDGE_ENABLED:-false}"
 FOXGLOVE_WAYPOINT_BRIDGE="${FOXGLOVE_WAYPOINT_BRIDGE:-false}"
 FOXGLOVE_WAYPOINT_TOPIC="${FOXGLOVE_WAYPOINT_TOPIC:-/foxglove/waypoints}"
@@ -301,6 +320,82 @@ start_explore_lite() {
   launch_bg "Explore Lite (${mode_name})" "${explore_cmd[@]}"
 }
 
+nav2_is_active() {
+  local out
+  local out_lower
+  out="$(
+    timeout 5s ros2 service call \
+      /lifecycle_manager_navigation/is_active \
+      std_srvs/srv/Trigger "{}" 2>/dev/null || true
+  )"
+  out_lower="${out,,}"
+  [[ "$out_lower" == *"success=true"* || "$out_lower" == *"success: true"* ]]
+}
+
+nav2_request_startup() {
+  timeout 5s ros2 service call \
+    /lifecycle_manager_navigation/manage_nodes \
+    nav2_msgs/srv/ManageLifecycleNodes "{command: 0}" >/dev/null 2>&1 || true
+}
+
+nav2_navigate_to_pose_server_count() {
+  local servers
+  servers="$(ros2 action info /navigate_to_pose 2>/dev/null | awk '/Action servers:/ {print $3; exit}')"
+  if [[ "$servers" =~ ^[0-9]+$ ]]; then
+    echo "$servers"
+  else
+    echo 0
+  fi
+}
+
+wait_for_nav2_ready() {
+  local timeout_sec="${1:-$NAV2_READY_TIMEOUT_SEC}"
+  local check_interval_sec="${NAV2_READY_CHECK_INTERVAL_SEC:-1}"
+  local startup_retry_sec="${NAV2_STARTUP_RETRY_SEC:-5}"
+  local startup_grace_sec="${NAV2_STARTUP_GRACE_SEC:-20}"
+  local start_ts
+  local now_ts
+  local next_startup_ts
+  local servers
+  local seen_active=0
+  local startup_requested=0
+
+  [[ "$timeout_sec" =~ ^[0-9]+$ ]] || timeout_sec=60
+  [[ "$check_interval_sec" =~ ^[0-9]+$ ]] || check_interval_sec=1
+  [[ "$startup_retry_sec" =~ ^[0-9]+$ ]] || startup_retry_sec=5
+  [[ "$startup_grace_sec" =~ ^[0-9]+$ ]] || startup_grace_sec=20
+
+  start_ts="$(date +%s)"
+  next_startup_ts=$((start_ts + startup_grace_sec))
+  echo "Waiting for Nav2 lifecycle manager and action servers..."
+
+  while true; do
+    now_ts="$(date +%s)"
+    if (( now_ts - start_ts >= timeout_sec )); then
+      echo "Nav2 readiness check timed out after ${timeout_sec}s." >&2
+      return 1
+    fi
+
+    servers="$(nav2_navigate_to_pose_server_count)"
+    if (( servers > 0 )); then
+      return 0
+    fi
+
+    if nav2_is_active; then
+      seen_active=1
+    else
+      if (( seen_active == 0 && startup_requested == 0 && now_ts >= next_startup_ts )); then
+        echo "Nav2 not active yet; requesting lifecycle startup..."
+        nav2_request_startup
+        startup_requested=1
+        next_startup_ts=$((now_ts + startup_retry_sec))
+      fi
+    fi
+
+    sleep "$check_interval_sec"
+  done
+}
+
 cleanup_leaked_stack() {
   local -a leaked=()
   local pid
@@ -336,6 +431,11 @@ cleanup_leaked_stack() {
 start_stack() {
   local job_mode="${1:-normal}"
   local existing
+  local rs_enable_color="$REALSENSE_ENABLE_COLOR"
+  local rs_enable_depth="$REALSENSE_ENABLE_DEPTH"
+  local rs_infra_profile="$REALSENSE_INFRA_PROFILE"
+  local rs_depth_profile="$REALSENSE_DEPTH_PROFILE"
+  local rs_color_profile="$REALSENSE_COLOR_PROFILE"
   existing="$(running_pids_from_file || true)"
   if [[ -n "$existing" ]]; then
     echo "Stack appears to already be running (PIDs: $existing)"
@@ -391,15 +491,33 @@ start_stack() {
       use_sim_time:="$NAV2_USE_SIM_TIME"
   sleep 2
 
+  if [[ "$job_mode" == "map" || "$job_mode" == "map-explore" ]]; then
+    if is_true "$REALSENSE_LIGHT_MODE_FOR_MAP"; then
+      rs_enable_color="$REALSENSE_ENABLE_COLOR_LIGHT"
+      rs_enable_depth="$REALSENSE_ENABLE_DEPTH_LIGHT"
+      rs_infra_profile="$REALSENSE_INFRA_PROFILE_LIGHT"
+      rs_depth_profile="$REALSENSE_DEPTH_PROFILE_LIGHT"
+      rs_color_profile="$REALSENSE_COLOR_PROFILE_LIGHT"
+      echo "Using low-load RealSense profile for ${job_mode} mode."
+    fi
+  fi
+
+  if is_true "$NVBLOX_ENABLED"; then
+    rs_enable_color=true
+    rs_enable_depth=true
+  fi
+
   launch_bg "RealSense Camera" \
     ros2 launch realsense2_camera rs_launch.py \
-      rgb_camera.color_profile:=640x480x30 \
-      depth_module.depth_profile:=640x480x30 \
-      depth_module.infra_profile:=640x480x30 \
-      enable_infra1:=true \
-      enable_infra2:=true \
-      enable_gyro:=true \
-      enable_accel:=true \
+      rgb_camera.color_profile:="$rs_color_profile" \
+      depth_module.depth_profile:="$rs_depth_profile" \
+      depth_module.infra_profile:="$rs_infra_profile" \
+      enable_infra1:="$REALSENSE_ENABLE_INFRA1" \
+      enable_infra2:="$REALSENSE_ENABLE_INFRA2" \
+      enable_gyro:="$REALSENSE_ENABLE_GYRO" \
+      enable_accel:="$REALSENSE_ENABLE_ACCEL" \
+      enable_color:="$rs_enable_color" \
+      enable_depth:="$rs_enable_depth" \
       unite_imu_method:=2 \
       align_depth.enable:=false \
       pointcloud.enable:=false
@@ -419,12 +537,9 @@ start_stack() {
   fi
 
 if [[ "$NAV2_USE_COMPOSITION" == "__AUTO__" ]]; then
-  if is_jetson_platform; then
-    NAV2_USE_COMPOSITION="True"
-  else
-    NAV2_USE_COMPOSITION="False"
-  fi
-  fi
+  # Prefer non-composed Nav2 by default for reliability under heavy perception load.
+  NAV2_USE_COMPOSITION="False"
+fi
 
   local isaac_overlay_regex='^/ssd/ros2_ws/install/(isaac_ros_nitros($|_)|isaac_ros_gxf($|_)|gxf_isaac_|custom_nitros_|isaac_common)'
   local vslam_ament_prefix
@@ -495,6 +610,10 @@ if [[ "$NAV2_USE_COMPOSITION" == "__AUTO__" ]]; then
         use_respawn:="$NAV2_USE_RESPAWN" \
         log_level:="$NAV2_LOG_LEVEL"
     sleep 2
+    if ! wait_for_nav2_ready "$NAV2_READY_TIMEOUT_SEC"; then
+      echo "Nav2 did not become ready in map-explore mode; not starting Explore Lite." >&2
+      return 1
+    fi
     start_explore_lite "start-map-explore" true
   fi
 
@@ -723,6 +842,10 @@ start_nav() {
     sleep 1
   fi
 
+  if ! wait_for_nav2_ready "$NAV2_READY_TIMEOUT_SEC"; then
+    echo "Nav2 did not become ready in navigation mode; skipping Explore Lite startup." >&2
+    return 1
+  fi
   start_explore_lite "start-nav"
 
   echo "Navigation stack started with map: $map_yaml"
