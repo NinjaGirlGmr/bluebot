@@ -8,3 +8,8 @@ scripts/__pycache__/
 Dockerfile
 ros_entrypoint.sh
 start_stack.sh
+
+# Keep only selected files under scripts/
+scripts/*
+!scripts/bluebot.sh
+!scripts/*.md
