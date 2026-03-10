@@ -1,21 +1,71 @@
 flowchart TD
-  A["bluebot start-nav <map_yaml>"] --> B["start_stack()"]
-  B --> C["ros2_serial_diff_drive_bridge\nodom_topic=/odom_raw, publish_tf=false"]
-  B --> D["serial_diff_drive_hw bringup\ncontroller_manager + controllers"]
-  B --> E["robot_state_publisher"]
-  B --> F["Lidar + static tf\n/frame_id=laser, /scan"]
-  B --> G["IMU node\n/imu/data_raw, /imu/orientation"]
-  B --> H["RealSense camera"]
-  B --> I["Isaac ROS Visual SLAM\n(direct or NITROS)"]
-  B --> J["teleop_twist_joy\n/joy -> /cmd_vel"]
-  B --> K["Foxglove Bridge"]
-  B --> L["State Estimation\nrobot_localization EKF"]
-  L --> |"/odometry/filtered -> /odom"| N["Fused odom for Nav2"]
+%% ---------- STYLE DEFINITIONS ----------
+classDef startup fill:#cce5ff,stroke:#3399ff,stroke-width:1px,color:#000;
+classDef hardware fill:#d1ecf1,stroke:#17a2b8,stroke-width:1px,color:#000;
+classDef sensors fill:#d4edda,stroke:#28a745,stroke-width:1px,color:#000;
+classDef vslam fill:#e2d9f3,stroke:#6f42c1,stroke-width:1px,color:#000;
+classDef teleop fill:#fff3cd,stroke:#ffc107,stroke-width:1px,color:#000;
+classDef nav2 fill:#f8d7da,stroke:#dc3545,stroke-width:1px,color:#000;
+classDef state fill:#f0f0f0,stroke:#6c757d,stroke-width:1px,color:#000;
 
-  B --> O["nav2_bringup bringup_launch.py\nslam:=False, map=<map_yaml>"]
-  O --> P["localization_launch.py\n(amcl)"]
-  P --> Q["AMCL\na. odom_topic=/odom"]
-  O --> R["navigation_launch.py"]
-  R --> S["controller_server\nplanner_server\nbt_navigator\ncostmaps"]
+%% ---------- STARTUP ----------
+A["bluebot start-nav <map_yaml>"]:::startup
+B["start_stack()"]:::startup
 
-  B --> T["optional: isaac grid localization bridge\n-> /initialpose"]
+%% ---------- HARDWARE ----------
+C["ros2_serial_diff_drive_bridge<br>odom_topic=/odom_raw, publish_tf=false"]:::hardware
+D["serial_diff_drive_hw bringup<br>controller_manager + controllers"]:::hardware
+E["robot_state_publisher"]:::hardware
+
+%% ---------- SENSORS ----------
+F["Lidar + static TF<br>/frame_id=laser, /scan"]:::sensors
+G["IMU node<br>/imu/data_raw, /imu/orientation"]:::sensors
+H["RealSense camera"]:::sensors
+
+%% ---------- VSLAM ----------
+I["Isaac ROS Visual SLAM<br>(direct or NITROS)"]:::vslam
+
+%% ---------- TELEOP & BRIDGE ----------
+J["teleop_twist_joy<br>/joy -> /cmd_vel"]:::teleop
+K["Foxglove Bridge"]:::teleop
+
+%% ---------- STATE ESTIMATION ----------
+L["State Estimation<br>robot_localization EKF"]:::state
+N["Fused odom for Nav2<br>/odometry/filtered -> /odom"]:::state
+
+%% ---------- NAV2 ----------
+O["nav2_bringup bringup_launch.py<br>slam:=False, map=<map_yaml>"]:::nav2
+P["localization_launch.py<br>(AMCL)"]:::nav2
+Q["AMCL<br>odom_topic=/odom"]:::nav2
+R["navigation_launch.py"]:::nav2
+S["controller_server, planner_server, bt_navigator, costmaps"]:::nav2
+
+%% ---------- OPTIONAL INITIAL POSE ----------
+T["optional: isaac grid localization bridge -> /initialpose"]:::vslam
+
+%% ---------- DATA FLOW ----------
+
+A -->|start stack| B
+
+%% Hardware & sensors
+B -->|start serial bridge| C
+B -->|bringup diff drive hw| D
+B -->|start RSP| E
+B -->|start lidar| F
+B -->|start IMU| G
+B -->|start camera| H
+B -->|start VSLAM| I
+B -->|start teleop| J
+B -->|start foxglove bridge| K
+B -->|start EKF| L
+L -->|fused odometry| N
+
+%% NAV2 stack
+B -->|start nav2| O
+O -->|start localization| P
+P -->|AMCL odom| Q
+O -->|start navigation| R
+R -->|control & plan| S
+
+%% Optional initial pose
+B -->|optional initialpose| T
