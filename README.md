@@ -1,4 +1,4 @@
-# Bluebot ROS 2 Workspace
+# Bluebot - Differiential Drive Autonomous Mapping and Navigation Robot
 
 This repository is the main ROS 2 Humble workspace for Bluebot bringup, mapping, navigation, and hardware integration.
 
