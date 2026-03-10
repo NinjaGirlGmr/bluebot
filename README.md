@@ -9,11 +9,27 @@ This repository is the main ROS 2 Humble workspace for Bluebot bringup, mapping,
 - `3d_stl/`: printable robot part models (`.stl`) and part notes.
 - `docs/`: project documentation and diagrams.
 
+## Hardware
+- Jetson Orin Nano Super Development Kit
+- Arduino Nano
+- Slamtec A2R8 Lidar
+- Intel Realsense R435 camera
+- Yahboom A471 10-azis IMU
+
+## Jetson Setup
+- 512GB E2C SSD
+
 ## Prerequisites
 
 - Ubuntu with ROS 2 Humble installed (`/opt/ros/humble`).
 - Colcon toolchain.
 - Robot hardware connected as expected (`/dev/arduino`, `/dev/lidar`, camera), when running on the robot.
+
+## 3rd Party ROS Packages
+
+- Navigation 2
+- Isaac ROS
+- Explorer Lite
 
 ## Setup
 
