@@ -6,11 +6,11 @@ classDef safety fill:#fff3cd,stroke:#ffc107,stroke-width:1px,color:#000;
 classDef nav2 fill:#e2d9f3,stroke:#6f42c1,stroke-width:1px,color:#000;
 classDef mapping fill:#f8d7da,stroke:#dc3545,stroke-width:1px,color:#000;
 classDef hardware fill:#d1ecf1,stroke:#17a2b8,stroke-width:1px,color:#000;
-classDef tf fill:#f0f0f0,stroke:#6c757d,stroke-width:1px,color:#000};
+classDef tf fill:#f0f0f0,stroke:#6c757d,stroke-width:1px,color:#000;
 classDef vslam fill:#dcd3f7,stroke:#6f42c1,stroke-width:1px,color:#000;
-classDef teleop fill:#fff3cd,stroke:#ffc107,stroke-width:1px,color:#000};
-classDef startup fill:#cce5ff,stroke:#3399ff,stroke-width:1px,color:#000};
-classDef fileops fill:#cce5ff,stroke:#3399ff,stroke-width:1px,color:#000};
+classDef teleop fill:#fff3cd,stroke:#ffc107,stroke-width:1px,color:#000;
+classDef startup fill:#cce5ff,stroke:#3399ff,stroke-width:1px,color:#000;
+classDef fileops fill:#cce5ff,stroke:#3399ff,stroke-width:1px,color:#000;
 
 %% ----------------- STARTUP -----------------
 StartNav["bluebot start-nav <map_yaml>"]:::startup
@@ -18,10 +18,10 @@ StartMap["bluebot start-map"]:::startup
 Stack["start_stack()"]:::startup
 
 %% ----------------- SENSORS -----------------
-Depth["Depth Camera<br>(aligned_depth_to_color/image_raw)"]:::sensors
-VslamOdom["VSLAM Odometry<br>/visual_slam/tracking/odometry"]:::sensors
-Scan["Lidar Scan<br>/scan"]:::sensors
-IMU["IMU<br>/imu/data"]:::sensors
+Depth["Depth Camera\n(aligned_depth_to_color/image_raw)"]:::sensors
+VslamOdom["VSLAM Odometry\n(/visual_slam/tracking/odometry)"]:::sensors
+Scan["Lidar Scan\n(/scan)"]:::sensors
+IMU["IMU\n(/imu/data)"]:::sensors
 RealSense["RealSense Camera"]:::sensors
 
 %% ----------------- PERCEPTION -----------------
@@ -36,11 +36,11 @@ SerialBridge["ros2_serial_diff_drive_bridge"]:::hardware
 Motors["Motor Controller"]:::hardware
 
 %% ----------------- VSLAM -----------------
-VSLAM["Isaac ROS Visual SLAM<br>(direct or NITROS)"]:::vslam
+VSLAM["Isaac ROS Visual SLAM\n(direct or NITROS)"]:::vslam
 
 %% ----------------- NAV2 -----------------
-Nav2Stack["nav2_bringup<br>(planner + controller + BT + costmaps)"]:::nav2
-AMCL["AMCL<br>odom_topic=/odom"]:::nav2
+Nav2Stack["nav2_bringup\n(planner + controller + BT + costmaps)"]:::nav2
+AMCL["AMCL\nodom_topic=/odom"]:::nav2
 Planner["Planner"]:::nav2
 Controller["Controller"]:::nav2
 BT["Behavior Tree"]:::nav2
@@ -50,12 +50,12 @@ TFmap["/tf map->odom"]:::tf
 InitialPose["/initialpose"]:::tf
 
 %% ----------------- STATE -----------------
-EKF["State Estimation<br>robot_localization EKF"]:::hardware
-FusedOdom["Fused odometry<br>/odometry/filtered -> /odom"]:::hardware
+EKF["State Estimation\n(robot_localization EKF)"]:::hardware
+FusedOdom["Fused odometry\n(/odometry/filtered -> /odom)"]:::hardware
 RSP["robot_state_publisher"]:::hardware
 
 %% ----------------- TELEOP & BRIDGE -----------------
-Teleop["teleop_twist_joy<br>/joy -> /cmd_vel"]:::teleop
+Teleop["teleop_twist_joy\n(/joy -> /cmd_vel)"]:::teleop
 Foxglove["Foxglove Bridge :8765"]:::teleop
 Waypoints["/foxglove/waypoints"]:::teleop
 WPBridge["foxglove_waypoint_bridge"]:::teleop
@@ -65,7 +65,7 @@ Status["/foxglove/waypoints/status"]:::teleop
 %% ----------------- MAPPING -----------------
 SLAMTB["SLAM Toolbox / slam_toolbox"]:::mapping
 Nvblox["Nvblox Node"]:::mapping
-MappingJob["mapping_job.launch.py"]:::mapping
+MappingJob["mapping_job.launch.py\n(slam:=False)"]:::mapping
 MapFiles["/ssd/maps/<name>.yaml + .pgm"]:::fileops
 WaypointsYAML["/ssd/maps/waypoints.yaml"]:::fileops
 CaptureWP["bluebot.sh capture-waypoint"]:::teleop
