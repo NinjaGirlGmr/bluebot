@@ -1,46 +1,46 @@
 flowchart TD
-%% ---------- STYLE DEFINITIONS ----------
+%% ----------------- STYLE DEFINITIONS -----------------
 classDef startup fill:#cce5ff,stroke:#3399ff,stroke-width:1px,color:#000;
 classDef hardware fill:#d1ecf1,stroke:#17a2b8,stroke-width:1px,color:#000;
-classDef sensors fill:#d4edda,stroke:#28a745,stroke-width:1px,color:#000;
-classDef vslam fill:#e2d9f3,stroke:#6f42c1,stroke-width:1px,color:#000;
+classDef sensors fill:#cce5ff,stroke:#3399ff,stroke-width:1px,color:#000;
+classDef vslam fill:#dcd3f7,stroke:#6f42c1,stroke-width:1px,color:#000;
 classDef teleop fill:#fff3cd,stroke:#ffc107,stroke-width:1px,color:#000;
 classDef state fill:#f0f0f0,stroke:#6c757d,stroke-width:1px,color:#000;
-classDef mapping fill:#f8d7da,stroke:#dc3545,stroke-width:1px,color:#000};
+classDef mapping fill:#f8d7da,stroke:#dc3545,stroke-width:1px,color:#000;
 classDef safety fill:#fff3cd,stroke:#ffc107,stroke-width:1px,color:#000;
 
-%% ---------- STARTUP ----------
+%% ----------------- STARTUP -----------------
 A["bluebot start-map"]:::startup
 B["start_stack()"]:::startup
 
-%% ---------- HARDWARE ----------
-C["ros2_serial_diff_drive_bridge<br>odom_topic=/odom_raw, publish_tf=false"]:::hardware
-D["serial_diff_drive_hw bringup<br>controller_manager + controllers"]:::hardware
+%% ----------------- HARDWARE -----------------
+C["ros2_serial_diff_drive_bridge\nodom_topic=/odom_raw, publish_tf=false"]:::hardware
+D["serial_diff_drive_hw bringup\ncontroller_manager + controllers"]:::hardware
 E["robot_state_publisher"]:::hardware
 
-%% ---------- SENSORS ----------
-F["Lidar + static TF<br>/frame_id=laser, /scan"]:::sensors
-G["IMU node<br>/imu/data_raw, /imu/orientation"]:::sensors
+%% ----------------- SENSORS -----------------
+F["Lidar + static TF\n/frame_id=laser, /scan"]:::sensors
+G["IMU node\n/imu/data_raw, /imu/orientation"]:::sensors
 H["RealSense camera"]:::sensors
 
-%% ---------- VSLAM ----------
-I["Isaac ROS Visual SLAM<br>(direct or NITROS)"]:::vslam
+%% ----------------- VSLAM -----------------
+I["Isaac ROS Visual SLAM\n(direct or NITROS)"]:::vslam
 
-%% ---------- TELEOP & BRIDGE ----------
-J["teleop_twist_joy<br>/joy -> /cmd_vel"]:::teleop
+%% ----------------- TELEOP & BRIDGE -----------------
+J["teleop_twist_joy\n/joy -> /cmd_vel"]:::teleop
 K["Foxglove Bridge"]:::teleop
 
-%% ---------- STATE ESTIMATION ----------
-L["State Estimation<br>robot_localization EKF"]:::state
-N["Fused odom for Nav2 inputs<br>/odometry/filtered -> /odom"]:::state
+%% ----------------- STATE ESTIMATION -----------------
+L["State Estimation\nrobot_localization EKF"]:::state
+N["Fused odom for Nav2 inputs\n/odometry/filtered -> /odom"]:::state
 
-%% ---------- MAPPING ----------
-M["mapping_job.launch.py<br>(slam:=False)"]:::mapping
+%% ----------------- MAPPING -----------------
+M["mapping_job.launch.py\n(slam:=False)"]:::mapping
 O["slam_toolbox (mapping mode)"]:::mapping
 P["drop_detector_node"]:::mapping
-Q["cmd_vel_safety_gate<br>(/cmd_vel_safe -> /cmd_vel)"]:::safety
+Q["cmd_vel_safety_gate\n(/cmd_vel_safe -> /cmd_vel)"]:::safety
 
-%% ---------- DATA FLOW ----------
+%% ----------------- DATA FLOW -----------------
 
 %% Startup flow
 A -->|start stack| B
@@ -63,4 +63,4 @@ B -->|start mapping job| M
 M -->|SLAM data| O
 M -->|drop detection| P
 M -->|safe command control| Q
-Q -->|cmd_vel_safe → bridge| C
+Q -->|cmd_vel_safe -> bridge| C
