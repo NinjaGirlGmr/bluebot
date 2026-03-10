@@ -54,6 +54,7 @@ NVBLOX_USE_SIM_TIME="${NVBLOX_USE_SIM_TIME:-$NAV2_USE_SIM_TIME}"
 EXPLORE_LITE_ENABLED="${EXPLORE_LITE_ENABLED:-false}"
 EXPLORE_LITE_NAMESPACE="${EXPLORE_LITE_NAMESPACE:-}"
 EXPLORE_LITE_USE_SIM_TIME="${EXPLORE_LITE_USE_SIM_TIME:-$NAV2_USE_SIM_TIME}"
+EXPLORE_LITE_PARAMS_FILE="${EXPLORE_LITE_PARAMS_FILE:-/ssd/ros2_ws/src/serial_diff_drive_hw/config/explore_lite_params.yaml}"
 MAP_EXPLORE_LITE_START_DELAY_SEC="${MAP_EXPLORE_LITE_START_DELAY_SEC:-10}"
 ISAAC_GRID_LOCALIZATION_ENABLED="${ISAAC_GRID_LOCALIZATION_ENABLED:-true}"
 ISAAC_GRID_LOCALIZER_LAUNCH_PKG="${ISAAC_GRID_LOCALIZER_LAUNCH_PKG:-isaac_nav2_pose_bridge}"
@@ -311,11 +312,15 @@ start_explore_lite() {
   fi
 
   explore_cmd=(
-    ros2 launch explore_lite explore.launch.py
-    "use_sim_time:=$EXPLORE_LITE_USE_SIM_TIME"
+    ros2 run explore_lite explore
+    --ros-args
+    --params-file "$EXPLORE_LITE_PARAMS_FILE"
+    -p "use_sim_time:=$EXPLORE_LITE_USE_SIM_TIME"
+    -r /tf:=tf
+    -r /tf_static:=tf_static
   )
   if [[ -n "$EXPLORE_LITE_NAMESPACE" ]]; then
-    explore_cmd+=("namespace:=$EXPLORE_LITE_NAMESPACE")
+    explore_cmd+=(-r "__ns:=$EXPLORE_LITE_NAMESPACE")
   fi
 
   launch_bg "Explore Lite (${mode_name})" "${explore_cmd[@]}"

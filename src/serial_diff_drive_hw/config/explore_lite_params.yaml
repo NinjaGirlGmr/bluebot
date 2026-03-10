@@ -1,0 +1,20 @@
+/**:
+  ros__parameters:
+    robot_base_frame: base_link
+    return_to_init: true
+    # Use the SLAM occupancy grid directly for frontier extraction so
+    # exploration can see raw unknown/free boundaries.
+    costmap_topic: /map
+    costmap_updates_topic: /map_updates
+    visualize: true
+    # Replan quickly so failed goals are reconsidered with fresh frontiers.
+    planner_frequency: 1.0
+    progress_timeout: 30.0
+    potential_scale: 3.0
+    orientation_scale: 0.0
+    gain_scale: 1.0
+    transform_tolerance: 0.3
+    # Reduce frontier size threshold to avoid prematurely filtering valid frontiers.
+    min_frontier_size: 0.3
+    # Keep blacklist radius small so one aborted goal does not suppress nearby candidates.
+    blacklist_tolerance_cells: 2.0
