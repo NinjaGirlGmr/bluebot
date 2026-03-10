@@ -54,6 +54,7 @@ NVBLOX_USE_SIM_TIME="${NVBLOX_USE_SIM_TIME:-$NAV2_USE_SIM_TIME}"
 EXPLORE_LITE_ENABLED="${EXPLORE_LITE_ENABLED:-false}"
 EXPLORE_LITE_NAMESPACE="${EXPLORE_LITE_NAMESPACE:-}"
 EXPLORE_LITE_USE_SIM_TIME="${EXPLORE_LITE_USE_SIM_TIME:-$NAV2_USE_SIM_TIME}"
+MAP_EXPLORE_LITE_START_DELAY_SEC="${MAP_EXPLORE_LITE_START_DELAY_SEC:-10}"
 ISAAC_GRID_LOCALIZATION_ENABLED="${ISAAC_GRID_LOCALIZATION_ENABLED:-true}"
 ISAAC_GRID_LOCALIZER_LAUNCH_PKG="${ISAAC_GRID_LOCALIZER_LAUNCH_PKG:-isaac_nav2_pose_bridge}"
 ISAAC_GRID_LOCALIZER_LAUNCH_FILE="${ISAAC_GRID_LOCALIZER_LAUNCH_FILE:-isaac_grid_localization_to_nav2.launch.py}"
@@ -73,7 +74,7 @@ ISAAC_GRID_LOCALIZER_FALLBACK_INITIAL_POSE_YAW="${ISAAC_GRID_LOCALIZER_FALLBACK_
 SELF_PGID="$(ps -o pgid= -p $$ 2>/dev/null | tr -d ' ' || true)"
 
 usage() {
-  echo "Usage: $0 [start|start-map|start-map-explore|start-nav <map>|save-map [name]|capture-waypoint [name]|send-waypoints [name ...]|slam-health|stop|restart|restart-map|restart-map-explore|restart-nav <map>|status]"
+  echo "Usage: $0 [start|start-map|start-map-explore|start-nav <map>|save-map [name]|capture-waypoint [name]|send-waypoints [name ...]|slam-health|nav-health|stop|restart|restart-map|restart-map-explore|restart-nav <map>|status]"
 }
 
 is_true() {
@@ -436,6 +437,16 @@ start_stack() {
   local rs_infra_profile="$REALSENSE_INFRA_PROFILE"
   local rs_depth_profile="$REALSENSE_DEPTH_PROFILE"
   local rs_color_profile="$REALSENSE_COLOR_PROFILE"
+  local launch_realsense="true"
+  local launch_vslam="true"
+  local launch_nvblox="$NVBLOX_ENABLED"
+
+  if [[ "$job_mode" == "map-explore" ]]; then
+    launch_realsense="false"
+    launch_vslam="false"
+    launch_nvblox="false"
+    echo "Map-explore mode: using lidar + odom only (RealSense, vSLAM, and nvblox disabled)."
+  fi
   existing="$(running_pids_from_file || true)"
   if [[ -n "$existing" ]]; then
     echo "Stack appears to already be running (PIDs: $existing)"
@@ -447,7 +458,8 @@ start_stack() {
   : > "$PID_FILE"
 
   local bridge_cmd_vel_topic="/cmd_vel"
-  if [[ "$job_mode" == "map" || "$job_mode" == "map-explore" ]]; then
+  if [[ "$job_mode" == "map" ]]; then
+    # Mapping job launches cmd_vel_safety_gate (/cmd_vel -> /cmd_vel_safe).
     bridge_cmd_vel_topic="/cmd_vel_safe"
   fi
 
@@ -491,7 +503,7 @@ start_stack() {
       use_sim_time:="$NAV2_USE_SIM_TIME"
   sleep 2
 
-  if [[ "$job_mode" == "map" || "$job_mode" == "map-explore" ]]; then
+  if is_true "$launch_realsense" && [[ "$job_mode" == "map" || "$job_mode" == "map-explore" ]]; then
     if is_true "$REALSENSE_LIGHT_MODE_FOR_MAP"; then
       rs_enable_color="$REALSENSE_ENABLE_COLOR_LIGHT"
       rs_enable_depth="$REALSENSE_ENABLE_DEPTH_LIGHT"
@@ -502,64 +514,68 @@ start_stack() {
     fi
   fi
 
-  if is_true "$NVBLOX_ENABLED"; then
+  if is_true "$launch_nvblox"; then
     rs_enable_color=true
     rs_enable_depth=true
   fi
 
-  launch_bg "RealSense Camera" \
-    ros2 launch realsense2_camera rs_launch.py \
-      rgb_camera.color_profile:="$rs_color_profile" \
-      depth_module.depth_profile:="$rs_depth_profile" \
-      depth_module.infra_profile:="$rs_infra_profile" \
-      enable_infra1:="$REALSENSE_ENABLE_INFRA1" \
-      enable_infra2:="$REALSENSE_ENABLE_INFRA2" \
-      enable_gyro:="$REALSENSE_ENABLE_GYRO" \
-      enable_accel:="$REALSENSE_ENABLE_ACCEL" \
-      enable_color:="$rs_enable_color" \
-      enable_depth:="$rs_enable_depth" \
-      unite_imu_method:=2 \
-      align_depth.enable:=false \
-      pointcloud.enable:=false
-  sleep 3
+  if is_true "$launch_realsense"; then
+    launch_bg "RealSense Camera" \
+      ros2 launch realsense2_camera rs_launch.py \
+        rgb_camera.color_profile:="$rs_color_profile" \
+        depth_module.depth_profile:="$rs_depth_profile" \
+        depth_module.infra_profile:="$rs_infra_profile" \
+        enable_infra1:="$REALSENSE_ENABLE_INFRA1" \
+        enable_infra2:="$REALSENSE_ENABLE_INFRA2" \
+        enable_gyro:="$REALSENSE_ENABLE_GYRO" \
+        enable_accel:="$REALSENSE_ENABLE_ACCEL" \
+        enable_color:="$rs_enable_color" \
+        enable_depth:="$rs_enable_depth" \
+        unite_imu_method:=2 \
+        align_depth.enable:=false \
+        pointcloud.enable:=false
+    sleep 3
 
-  launch_bg "static TF between base_link and camera_link" \
-    ros2 run tf2_ros static_transform_publisher 0.097 0 0.155 0 0 0 base_link camera_link
-  sleep 1
-
-  local vslam_launch_pkg="serial_diff_drive_hw"
-  local vslam_launch_file="isaac_ros_visual_slam_existing_realsense.launch.py"
-  if [[ "$VSLAM_MODE" == "nitros" ]]; then
-    vslam_launch_file="isaac_ros_visual_slam_existing_realsense_nitros.launch.py"
-  elif [[ "$VSLAM_MODE" != "direct" ]]; then
-    echo "Invalid VSLAM_MODE='$VSLAM_MODE' (expected: direct|nitros)"
-    exit 1
+    launch_bg "static TF between base_link and camera_link" \
+      ros2 run tf2_ros static_transform_publisher 0.097 0 0.155 0 0 0 base_link camera_link
+    sleep 1
   fi
 
-if [[ "$NAV2_USE_COMPOSITION" == "__AUTO__" ]]; then
-  # Prefer non-composed Nav2 by default for reliability under heavy perception load.
-  NAV2_USE_COMPOSITION="False"
-fi
+  if [[ "$NAV2_USE_COMPOSITION" == "__AUTO__" ]]; then
+    # Prefer non-composed Nav2 by default for reliability under heavy perception load.
+    NAV2_USE_COMPOSITION="False"
+  fi
 
-  local isaac_overlay_regex='^/ssd/ros2_ws/install/(isaac_ros_nitros($|_)|isaac_ros_gxf($|_)|gxf_isaac_|custom_nitros_|isaac_common)'
-  local vslam_ament_prefix
-  local vslam_cmake_prefix
-  local vslam_colcon_prefix
-  local vslam_ld_library_path
+  if is_true "$launch_vslam"; then
+    local vslam_launch_pkg="serial_diff_drive_hw"
+    local vslam_launch_file="isaac_ros_visual_slam_existing_realsense.launch.py"
+    if [[ "$VSLAM_MODE" == "nitros" ]]; then
+      vslam_launch_file="isaac_ros_visual_slam_existing_realsense_nitros.launch.py"
+    elif [[ "$VSLAM_MODE" != "direct" ]]; then
+      echo "Invalid VSLAM_MODE='$VSLAM_MODE' (expected: direct|nitros)"
+      exit 1
+    fi
 
-  vslam_ament_prefix="$(filter_colon_paths "${AMENT_PREFIX_PATH:-}" "$isaac_overlay_regex")"
-  vslam_cmake_prefix="$(filter_colon_paths "${CMAKE_PREFIX_PATH:-}" "$isaac_overlay_regex")"
-  vslam_colcon_prefix="$(filter_colon_paths "${COLCON_PREFIX_PATH:-}" "$isaac_overlay_regex")"
-  vslam_ld_library_path="$(filter_colon_paths "${LD_LIBRARY_PATH:-}" "$isaac_overlay_regex")"
+    local isaac_overlay_regex='^/ssd/ros2_ws/install/(isaac_ros_nitros($|_)|isaac_ros_gxf($|_)|gxf_isaac_|custom_nitros_|isaac_common)'
+    local vslam_ament_prefix
+    local vslam_cmake_prefix
+    local vslam_colcon_prefix
+    local vslam_ld_library_path
 
-  launch_bg "Isaac ROS Visual SLAM (mode: $VSLAM_MODE)" \
-    env \
-      AMENT_PREFIX_PATH="$vslam_ament_prefix" \
-      CMAKE_PREFIX_PATH="$vslam_cmake_prefix" \
-      COLCON_PREFIX_PATH="$vslam_colcon_prefix" \
-      LD_LIBRARY_PATH="$vslam_ld_library_path" \
-      ros2 launch "$vslam_launch_pkg" "$vslam_launch_file"
-  sleep 2
+    vslam_ament_prefix="$(filter_colon_paths "${AMENT_PREFIX_PATH:-}" "$isaac_overlay_regex")"
+    vslam_cmake_prefix="$(filter_colon_paths "${CMAKE_PREFIX_PATH:-}" "$isaac_overlay_regex")"
+    vslam_colcon_prefix="$(filter_colon_paths "${COLCON_PREFIX_PATH:-}" "$isaac_overlay_regex")"
+    vslam_ld_library_path="$(filter_colon_paths "${LD_LIBRARY_PATH:-}" "$isaac_overlay_regex")"
+
+    launch_bg "Isaac ROS Visual SLAM (mode: $VSLAM_MODE)" \
+      env \
+        AMENT_PREFIX_PATH="$vslam_ament_prefix" \
+        CMAKE_PREFIX_PATH="$vslam_cmake_prefix" \
+        COLCON_PREFIX_PATH="$vslam_colcon_prefix" \
+        LD_LIBRARY_PATH="$vslam_ld_library_path" \
+        ros2 launch "$vslam_launch_pkg" "$vslam_launch_file"
+    sleep 2
+  fi
 
   if is_true "$FOXGLOVE_BRIDGE_ENABLED"; then
     launch_bg "Foxglove Bridge" \
@@ -567,7 +583,7 @@ fi
     sleep 1
   fi
 
-  start_nvblox
+  start_nvblox "$launch_nvblox"
   sleep 1
 
   local teleop_linear_scale="0.5"
@@ -614,6 +630,14 @@ fi
       echo "Nav2 did not become ready in map-explore mode; not starting Explore Lite." >&2
       return 1
     fi
+    local map_explore_delay_sec="$MAP_EXPLORE_LITE_START_DELAY_SEC"
+    if ! [[ "$map_explore_delay_sec" =~ ^[0-9]+$ ]]; then
+      map_explore_delay_sec=10
+    fi
+    if (( map_explore_delay_sec > 0 )); then
+      echo "Waiting ${map_explore_delay_sec}s for SLAM map growth before starting Explore Lite..."
+      sleep "$map_explore_delay_sec"
+    fi
     start_explore_lite "start-map-explore" true
   fi
 
@@ -623,7 +647,7 @@ fi
     echo "Maps will be saved under: $MAP_DIR"
     echo "Run '$0 save-map <name>' to save (example: $0 save-map office_a)."
   elif [[ "$job_mode" == "map-explore" ]]; then
-    echo "Map-and-explore mode active with laser local-costmap layers."
+    echo "Map-and-explore mode active with lidar + odom stack (vSLAM and nvblox disabled)."
     echo "Maps will be saved under: $MAP_DIR"
     echo "Run '$0 save-map <name>' to save (example: $0 save-map office_a)."
   fi
@@ -1207,6 +1231,144 @@ status_stack() {
   fi
 }
 
+nav_health() {
+  local node_list=""
+  local -a required_nodes=("/controller_server" "/planner_server" "/behavior_server" "/bt_navigator")
+  local -a missing_nodes=()
+  local node=""
+  local explore_status=""
+  local action_snapshot=""
+  local active_count=0
+  local succeeded_count=0
+  local canceled_count=0
+  local aborted_count=0
+  local other_count=0
+  local cmd_sample=""
+  local odom_x_1=""
+  local odom_x_2=""
+  local odom_delta=""
+  local rosout_tmp=""
+  local progress_fail_count=0
+  local collision_ahead_count=0
+  local control_missed_count=0
+  local planner_missed_count=0
+  local frontier_done_count=0
+  local no_frontier_count=0
+  local goal_failed_count=0
+  local relevant_lines=""
+  local bridge_cmd_topic=""
+  local bridge_cmd_publishers=""
+
+  source_ros
+
+  node_list="$(timeout 4s ros2 node list 2>/dev/null || true)"
+  if [[ -z "$node_list" ]]; then
+    echo "Nav status: unable to query ROS graph (is the stack running?)."
+    return 1
+  fi
+
+  for node in "${required_nodes[@]}"; do
+    if ! grep -qx "$node" <<< "$node_list"; then
+      missing_nodes+=("$node")
+    fi
+  done
+
+  if [[ ${#missing_nodes[@]} -eq 0 ]]; then
+    echo "Nav nodes: OK (controller/planner/behavior/bt_navigator present)."
+  else
+    echo "Nav nodes: missing ${missing_nodes[*]}"
+  fi
+
+  bridge_cmd_topic="$(timeout 4s ros2 param get /serial_diff_drive_bridge cmd_vel_topic 2>/dev/null | awk '/value is:/ {print $NF; exit}' || true)"
+  if [[ -n "$bridge_cmd_topic" ]]; then
+    bridge_cmd_publishers="$(timeout 4s ros2 topic info "$bridge_cmd_topic" 2>/dev/null | awk '/Publisher count:/ {print $3; exit}' || true)"
+    echo "Bridge cmd topic: $bridge_cmd_topic (publishers=${bridge_cmd_publishers:-unknown})"
+    if [[ "${bridge_cmd_publishers:-}" == "0" ]]; then
+      echo "Bridge cmd path warning: no publishers on $bridge_cmd_topic"
+    fi
+  else
+    echo "Bridge cmd topic: unknown (serial_diff_drive_bridge parameter unavailable)"
+  fi
+
+  if grep -qx "/explore_node" <<< "$node_list"; then
+    explore_status="$(timeout 4s ros2 topic echo /explore/status --once 2>/dev/null | awk '/^status:/ {print $2; exit}' || true)"
+    if [[ -n "$explore_status" ]]; then
+      echo "Explore status: $explore_status"
+    else
+      echo "Explore status: unknown (no /explore/status sample)."
+    fi
+  else
+    echo "Explore status: explore_node not running."
+  fi
+
+  action_snapshot="$(timeout 4s ros2 topic echo /navigate_to_pose/_action/status --once 2>/dev/null || true)"
+  if [[ -n "$action_snapshot" ]]; then
+    read -r active_count succeeded_count canceled_count aborted_count other_count <<< "$(
+      awk '
+        /^  status:/ {
+          s = $2 + 0
+          if (s == 1 || s == 2 || s == 3) active++
+          else if (s == 4) succeeded++
+          else if (s == 5) canceled++
+          else if (s == 6) aborted++
+          else other++
+        }
+        END { print active + 0, succeeded + 0, canceled + 0, aborted + 0, other + 0 }
+      ' <<< "$action_snapshot"
+    )"
+    echo "NavigateToPose statuses: active=$active_count succeeded=$succeeded_count canceled=$canceled_count aborted=$aborted_count other=$other_count"
+  else
+    echo "NavigateToPose statuses: unavailable (no /navigate_to_pose/_action/status sample)."
+  fi
+
+  cmd_sample="$(
+    timeout 4s ros2 topic echo /cmd_vel_nav --once --field linear.x 2>/dev/null \
+      | awk '/^-?[0-9]+([.][0-9]+)?$/ {print; exit}' || true
+  )"
+  if [[ -n "$cmd_sample" ]]; then
+    echo "cmd_vel_nav: present (sample linear.x=$cmd_sample)"
+  else
+    echo "cmd_vel_nav: no numeric sample received in 4s"
+  fi
+
+  odom_x_1="$(
+    timeout 4s ros2 topic echo /odom --once --field pose.pose.position.x 2>/dev/null \
+      | awk '/^-?[0-9]+([.][0-9]+)?$/ {print; exit}' || true
+  )"
+  sleep 1
+  odom_x_2="$(
+    timeout 4s ros2 topic echo /odom --once --field pose.pose.position.x 2>/dev/null \
+      | awk '/^-?[0-9]+([.][0-9]+)?$/ {print; exit}' || true
+  )"
+  if [[ "$odom_x_1" =~ ^-?[0-9]+([.][0-9]+)?$ && "$odom_x_2" =~ ^-?[0-9]+([.][0-9]+)?$ ]]; then
+    odom_delta="$(awk -v a="$odom_x_1" -v b="$odom_x_2" 'BEGIN { d = b - a; if (d < 0) d = -d; printf "%.4f", d }')"
+    echo "odom: x=$odom_x_1 -> $odom_x_2 (|delta|=${odom_delta} m over ~1s)"
+  else
+    echo "odom: unable to sample pose.pose.position.x twice"
+  fi
+
+  rosout_tmp="$(mktemp)"
+  timeout 8s ros2 topic echo /rosout > "$rosout_tmp" 2>/dev/null || true
+
+  progress_fail_count="$( (rg -n "Failed to make progress" "$rosout_tmp" 2>/dev/null || true) | wc -l | tr -d ' ' )"
+  collision_ahead_count="$( (rg -n "Collision Ahead" "$rosout_tmp" 2>/dev/null || true) | wc -l | tr -d ' ' )"
+  control_missed_count="$( (rg -n "Control loop missed" "$rosout_tmp" 2>/dev/null || true) | wc -l | tr -d ' ' )"
+  planner_missed_count="$( (rg -n "Planner loop missed" "$rosout_tmp" 2>/dev/null || true) | wc -l | tr -d ' ' )"
+  frontier_done_count="$( (rg -n "All frontiers traversed/tried out" "$rosout_tmp" 2>/dev/null || true) | wc -l | tr -d ' ' )"
+  no_frontier_count="$( (rg -n "No frontiers found" "$rosout_tmp" 2>/dev/null || true) | wc -l | tr -d ' ' )"
+  goal_failed_count="$( (rg -n "Goal failed" "$rosout_tmp" 2>/dev/null || true) | wc -l | tr -d ' ' )"
+
+  echo "Recent rosout (8s): progress_fail=$progress_fail_count collision_ahead=$collision_ahead_count control_missed=$control_missed_count planner_missed=$planner_missed_count frontiers_exhausted=$frontier_done_count no_frontiers=$no_frontier_count goal_failed=$goal_failed_count"
+
+  relevant_lines="$(rg -n "Failed to make progress|Collision Ahead|Control loop missed|Planner loop missed|All frontiers traversed/tried out|No frontiers found|Goal failed" "$rosout_tmp" 2>/dev/null || true)"
+  if [[ -n "$relevant_lines" ]]; then
+    echo "Recent warning/error lines:"
+    echo "$relevant_lines" | tail -n 8
+  fi
+
+  rm -f "$rosout_tmp"
+}
+
 slam_health() {
   local latest_launch=""
   local start_line=""
@@ -1320,6 +1482,9 @@ case "$command" in
     ;;
   slam-health)
     slam_health
+    ;;
+  nav-health)
+    nav_health
     ;;
   stop)
     stop_stack

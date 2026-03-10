@@ -13,19 +13,20 @@ Path: `/ssd/ros2_ws/scripts/bluebot.sh`
 ## Usage
 
 ```bash
-/ssd/ros2_ws/scripts/bluebot.sh [start|start-map|start-map-explore|start-nav <map>|save-map [name]|capture-waypoint [name]|send-waypoints [name ...]|slam-health|stop|restart|restart-map|restart-map-explore|restart-nav <map>|status]
+/ssd/ros2_ws/scripts/bluebot.sh [start|start-map|start-map-explore|start-nav <map>|save-map [name]|capture-waypoint [name]|send-waypoints [name ...]|slam-health|nav-health|stop|restart|restart-map|restart-map-explore|restart-nav <map>|status]
 ```
 
 ## Commands
 
 - `start`: Start base robot stack (bridge, control, lidar, camera, vSLAM, Foxglove, teleop).
 - `start-map`: Start base stack plus SLAM mapping job.
-- `start-map-explore`: Start base stack plus SLAM + navigation + active explore and local nvblox obstacle avoidance.
-- `start-nav <map>`: Start base stack plus Nav2 localization/navigation using a saved map.
+- `start-map-explore`: Start lidar + odom stack plus SLAM + navigation + active explore (vSLAM and nvblox are disabled in this mode).
+- `start-nav <map>`: Start base stack plus Nav2 localization/navigation using a saved map. Use this mode (with `NVBLOX_ENABLED=true`) for perception-based local obstacle avoidance.
 - `save-map [name]`: Save current map to `/ssd/maps`.
 - `capture-waypoint [name]`: Capture current `map -> base_link` pose into waypoint YAML.
 - `send-waypoints [name ...]`: Publish all or selected waypoints as `PoseArray` to Foxglove waypoint topic.
 - `slam-health`: Inspect latest SLAM launch/logs and classify `RUNNING`, `CLEAN EXIT`, or `CRASHED`, including TF/queue warnings.
+- `nav-health`: Snapshot Nav2/explore health (required nodes, explore status, NavigateToPose status counts, cmd/odom samples, and recent rosout warning/error counters).
 - `stop`: Graceful shutdown of stack and cleanup.
 - `restart`: `stop` then `start`.
 - `restart-map`: `stop` then `start-map`.
@@ -50,7 +51,10 @@ Notes:
 - `NVBLOX_ENABLED` launches an nvblox perception node alongside the existing stack using the existing RealSense streams.
 - `EXPLORE_LITE_ENABLED` launches frontier exploration in `start-map` and `start-nav`.
 - `NVBLOX_USE_SIM_TIME` and `EXPLORE_LITE_USE_SIM_TIME` default to the current `NAV2_USE_SIM_TIME` value.
-- `start-map-explore` forces both NVBLOX and Explore Lite on for that mode.
+- `start-map-explore` forces Explore Lite on and disables RealSense/vSLAM/nvblox to run on lidar + odom only.
+- `start-map-explore` now waits `MAP_EXPLORE_LITE_START_DELAY_SEC` (default `10`) after Nav2 is ready before launching Explore Lite.
+- `start-map-explore` routes drive commands directly from Nav2 (`/cmd_vel`) to the serial bridge (no `/cmd_vel_safe` gate in this mode).
+- `start-map-explore` uses tuned Nav2 map-explore parameters (more tolerant progress checker and lower controller/planner load targets) to reduce false `Failed to make progress` aborts on Jetson.
 
 ## Quick Workflows
 
@@ -68,7 +72,7 @@ cd /ssd
 ```bash
 cd /ssd
 /ssd/ros2_ws/scripts/bluebot.sh start-map-explore
-# robot explores while building map and using nvblox local obstacle layer
+# robot explores while building map using lidar + odom only
 /ssd/ros2_ws/scripts/bluebot.sh save-map office_a
 ```
 
@@ -125,6 +129,7 @@ Send only selected waypoints:
 - `EXPLORE_LITE_ENABLED` (default `false`)
 - `EXPLORE_LITE_NAMESPACE` (default empty)
 - `EXPLORE_LITE_USE_SIM_TIME` (default `$NAV2_USE_SIM_TIME`)
+- `MAP_EXPLORE_LITE_START_DELAY_SEC` (default `10`)
 - `ISAAC_GRID_LOCALIZATION_ENABLED` (default `true`)
 - `ISAAC_GRID_LOCALIZER_LAUNCH_PKG` (default `isaac_nav2_pose_bridge`)
 - `ISAAC_GRID_LOCALIZER_LAUNCH_FILE` (default `isaac_grid_localization_to_nav2.launch.py`)
@@ -150,3 +155,4 @@ FOXGLOVE_WAYPOINT_TOPIC=/my_waypoints /ssd/ros2_ws/scripts/bluebot.sh restart-na
 - `Map file not found`: pass map name in `/ssd/maps/<name>.yaml` or full `.yaml` path.
 - `Waypoint file not found`: run `capture-waypoint` first.
 - `Stack appears to already be running`: run `/ssd/ros2_ws/scripts/bluebot.sh stop` before starting a different mode.
+- `controller_server Failed to make progress` repeats: run `/ssd/ros2_ws/scripts/bluebot.sh nav-health` and check `progress_fail`, `collision_ahead`, and `control_missed` counters.
