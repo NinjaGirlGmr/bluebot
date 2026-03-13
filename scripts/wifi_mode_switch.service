@@ -1,0 +1,19 @@
+[Unit]
+Description=Bluebot WiFi Mode Switch (GPIO + OLED)
+Wants=NetworkManager.service
+After=NetworkManager.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/ssd/ros2_ws
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /ssd/ros2_ws/scripts/wifi_mode_switch.py
+Restart=always
+RestartSec=2
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

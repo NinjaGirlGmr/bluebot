@@ -13,3 +13,5 @@ start_stack.sh
 scripts/*
 !scripts/bluebot.sh
 !scripts/*.md
+!scripts/wifi_mode_switch.py
+!scripts/wifi_mode_switch.service
