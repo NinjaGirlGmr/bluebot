@@ -142,15 +142,17 @@ controller_server:
     min_theta_velocity_threshold: 0.001
     failure_tolerance: 1.0
     progress_checker_plugin: "progress_checker"
+    current_goal_checker: "general_goal_checker"
     goal_checker_plugins: ["general_goal_checker"] # "precise_goal_checker"
     controller_plugins: ["FollowPath"]
 
     # Progress checker parameters
     progress_checker:
       plugin: "nav2_controller::SimpleProgressChecker"
-      # Be more tolerant of slow/stop-go motion during frontier exploration.
-      required_movement_radius: 0.05
-      movement_time_allowance: 40.0
+      # Frontier exploration often has slow/stop-go real motion near clutter.
+      # Relax these thresholds to avoid false "Failed to make progress".
+      required_movement_radius: 0.03
+      movement_time_allowance: 90.0
     # Goal checker parameters
     #precise_goal_checker:
     #  plugin: "nav2_controller::SimpleGoalChecker"
@@ -171,7 +173,8 @@ controller_server:
       max_vel_x: 0.20
       max_vel_y: 0.0
       max_vel_theta: 1.0
-      min_speed_xy: 0.0
+      # Keep linear commands above drivetrain deadband in map-explore mode.
+      min_speed_xy: 0.1
       max_speed_xy: 0.20
       min_speed_theta: 0.0
       # Add high threshold velocity for turtlebot 3 issue.
@@ -190,7 +193,7 @@ controller_server:
       angular_granularity: 0.025
       transform_tolerance: 0.2
       xy_goal_tolerance: 0.25
-      trans_stopped_velocity: 0.08
+      trans_stopped_velocity: 0.03
       short_circuit_trajectory_evaluation: True
       stateful: True
       critics: ["RotateToGoal", "Oscillation", "BaseObstacle", "GoalAlign", "PathAlign", "PathDist", "GoalDist"]
