@@ -12,6 +12,7 @@ Environment=PYTHONUNBUFFERED=1
 ExecStart=/usr/bin/python3 /ssd/ros2_ws/scripts/wifi_mode_switch.py
 Restart=always
 RestartSec=2
+RestartPreventExitStatus=1
 StandardOutput=journal
 StandardError=journal
 
