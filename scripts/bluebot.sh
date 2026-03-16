@@ -15,6 +15,10 @@ MAP_IMAGE_FORMAT="${MAP_IMAGE_FORMAT:-pgm}"
 LIDAR_SCAN_FREQUENCY="${LIDAR_SCAN_FREQUENCY:-6.0}"
 LIDAR_ANGLE_COMPENSATE="${LIDAR_ANGLE_COMPENSATE:-false}"
 LIDAR_SCAN_MODE="${LIDAR_SCAN_MODE:-}"
+BRIDGE_STALL_COMPENSATION_ENABLED="${BRIDGE_STALL_COMPENSATION_ENABLED:-true}"
+BRIDGE_MIN_EFFECTIVE_LINEAR_MPS="${BRIDGE_MIN_EFFECTIVE_LINEAR_MPS:-0.14}"
+BRIDGE_MIN_EFFECTIVE_ANGULAR_RAD_S="${BRIDGE_MIN_EFFECTIVE_ANGULAR_RAD_S:-0.0}"
+BRIDGE_ZERO_CMD_EPSILON="${BRIDGE_ZERO_CMD_EPSILON:-0.0001}"
 NAV2_USE_SIM_TIME="${NAV2_USE_SIM_TIME:-false}"
 NAV2_PARAMS_FILE="${NAV2_PARAMS_FILE:-/ssd/ros2_ws/src/serial_diff_drive_hw/config/nav2_navigation_params.yaml}"
 NAV2_MAP_EXPLORE_PARAMS_FILE="${NAV2_MAP_EXPLORE_PARAMS_FILE:-/ssd/ros2_ws/src/serial_diff_drive_hw/config/nav2_map_explore_params.yaml}"
@@ -41,8 +45,11 @@ REALSENSE_ENABLE_DEPTH_LIGHT="${REALSENSE_ENABLE_DEPTH_LIGHT:-false}"
 REALSENSE_INFRA_PROFILE_LIGHT="${REALSENSE_INFRA_PROFILE_LIGHT:-640x480x15}"
 REALSENSE_DEPTH_PROFILE_LIGHT="${REALSENSE_DEPTH_PROFILE_LIGHT:-640x480x15}"
 REALSENSE_COLOR_PROFILE_LIGHT="${REALSENSE_COLOR_PROFILE_LIGHT:-640x480x15}"
-FOXGLOVE_BRIDGE_ENABLED="${FOXGLOVE_BRIDGE_ENABLED:-false}"
-FOXGLOVE_WAYPOINT_BRIDGE="${FOXGLOVE_WAYPOINT_BRIDGE:-false}"
+FOXGLOVE_BRIDGE_ENABLED="${FOXGLOVE_BRIDGE_ENABLED:-true}"
+FOXGLOVE_BRIDGE_PORT="${FOXGLOVE_BRIDGE_PORT:-8765}"
+FOXGLOVE_BRIDGE_ADDRESS="${FOXGLOVE_BRIDGE_ADDRESS:-0.0.0.0}"
+FOXGLOVE_BRIDGE_CAPABILITIES="${FOXGLOVE_BRIDGE_CAPABILITIES:-[clientPublish,services,connectionGraph,assets]}"
+FOXGLOVE_WAYPOINT_BRIDGE="${FOXGLOVE_WAYPOINT_BRIDGE:-true}"
 FOXGLOVE_WAYPOINT_TOPIC="${FOXGLOVE_WAYPOINT_TOPIC:-/foxglove/waypoints}"
 FOXGLOVE_WAYPOINT_FRAME="${FOXGLOVE_WAYPOINT_FRAME:-map}"
 FOXGLOVE_WAYPOINT_ACTION_NAME="${FOXGLOVE_WAYPOINT_ACTION_NAME:-/navigate_through_poses}"
@@ -55,7 +62,9 @@ EXPLORE_LITE_ENABLED="${EXPLORE_LITE_ENABLED:-false}"
 EXPLORE_LITE_NAMESPACE="${EXPLORE_LITE_NAMESPACE:-}"
 EXPLORE_LITE_USE_SIM_TIME="${EXPLORE_LITE_USE_SIM_TIME:-$NAV2_USE_SIM_TIME}"
 EXPLORE_LITE_PARAMS_FILE="${EXPLORE_LITE_PARAMS_FILE:-/ssd/ros2_ws/src/serial_diff_drive_hw/config/explore_lite_params.yaml}"
-MAP_EXPLORE_LITE_START_DELAY_SEC="${MAP_EXPLORE_LITE_START_DELAY_SEC:-10}"
+MAP_EXPLORE_LITE_START_DELAY_SEC="${MAP_EXPLORE_LITE_START_DELAY_SEC:-20}"
+MAP_EXPLORE_TF_READY_TIMEOUT_SEC="${MAP_EXPLORE_TF_READY_TIMEOUT_SEC:-90}"
+MAP_EXPLORE_REQUIRE_TF_READY="${MAP_EXPLORE_REQUIRE_TF_READY:-true}"
 ISAAC_GRID_LOCALIZATION_ENABLED="${ISAAC_GRID_LOCALIZATION_ENABLED:-true}"
 ISAAC_GRID_LOCALIZER_LAUNCH_PKG="${ISAAC_GRID_LOCALIZER_LAUNCH_PKG:-isaac_nav2_pose_bridge}"
 ISAAC_GRID_LOCALIZER_LAUNCH_FILE="${ISAAC_GRID_LOCALIZER_LAUNCH_FILE:-isaac_grid_localization_to_nav2.launch.py}"
@@ -285,6 +294,8 @@ leaked_stack_pids() {
     /slam_toolbox\/sync_slam_toolbox_node/ ||
     /nvblox_node/ ||
     /explore_node/ ||
+    /explore_lite\/explore/ ||
+    /ros2 run explore_lite explore/ ||
     /nav2_map_server\/map_saver_server/ ||
     /nav2_lifecycle_manager\/lifecycle_manager/ ||
     /rplidar|sllidar/ {
@@ -324,6 +335,11 @@ start_explore_lite() {
   fi
 
   launch_bg "Explore Lite (${mode_name})" "${explore_cmd[@]}"
+  sleep 2
+  if ! pgrep -fa "explore_lite/lib/explore_lite/explore|ros2 run explore_lite explore" >/dev/null 2>&1; then
+    echo "Explore Lite appears to have exited immediately after launch in ${mode_name} mode." >&2
+    return 1
+  fi
 }
 
 nav2_is_active() {
@@ -402,6 +418,30 @@ wait_for_nav2_ready() {
   done
 }
 
+wait_for_tf_map_base() {
+  local timeout_sec="${1:-$MAP_EXPLORE_TF_READY_TIMEOUT_SEC}"
+  local tf_output=""
+  local last_line=""
+  [[ "$timeout_sec" =~ ^[0-9]+$ ]] || timeout_sec=25
+  echo "Waiting for TF map -> base_link..."
+
+  # Capture tf2_echo output directly instead of piping through grep.
+  # With `set -o pipefail`, grep -q can make the pipeline fail even on match
+  # (tf2_echo exits on SIGPIPE), causing false negatives.
+  tf_output="$(timeout "${timeout_sec}s" ros2 run tf2_ros tf2_echo map base_link 2>&1 || true)"
+  if [[ "$tf_output" == *"At time"* ]]; then
+    echo "TF map -> base_link is available."
+    return 0
+  fi
+
+  echo "TF map -> base_link not available after ${timeout_sec}s." >&2
+  last_line="$(printf '%s\n' "$tf_output" | tail -n 1)"
+  if [[ -n "$last_line" ]]; then
+    echo "Last tf2_echo message: $last_line" >&2
+  fi
+  return 1
+}
+
 cleanup_leaked_stack() {
   local -a leaked=()
   local pid
@@ -473,6 +513,10 @@ start_stack() {
       port:=/dev/arduino \
       cmd_vel_topic:="$bridge_cmd_vel_topic" \
       odom_topic:=/odom_raw \
+      enable_stall_compensation:="$BRIDGE_STALL_COMPENSATION_ENABLED" \
+      min_effective_linear_mps:="$BRIDGE_MIN_EFFECTIVE_LINEAR_MPS" \
+      min_effective_angular_rad_s:="$BRIDGE_MIN_EFFECTIVE_ANGULAR_RAD_S" \
+      zero_cmd_epsilon:="$BRIDGE_ZERO_CMD_EPSILON" \
       publish_tf:=false
   sleep 2
 
@@ -583,8 +627,11 @@ start_stack() {
   fi
 
   if is_true "$FOXGLOVE_BRIDGE_ENABLED"; then
-    launch_bg "Foxglove Bridge" \
-      ros2 launch foxglove_bridge foxglove_bridge_launch.xml port:=8765
+    launch_bg "Foxglove Bridge (:${FOXGLOVE_BRIDGE_PORT})" \
+      ros2 launch foxglove_bridge foxglove_bridge_launch.xml \
+        port:="$FOXGLOVE_BRIDGE_PORT" \
+        address:="$FOXGLOVE_BRIDGE_ADDRESS" \
+        capabilities:="$FOXGLOVE_BRIDGE_CAPABILITIES"
     sleep 1
   fi
 
@@ -643,6 +690,13 @@ start_stack() {
       echo "Waiting ${map_explore_delay_sec}s for SLAM map growth before starting Explore Lite..."
       sleep "$map_explore_delay_sec"
     fi
+    if ! wait_for_tf_map_base "$MAP_EXPLORE_TF_READY_TIMEOUT_SEC"; then
+      if is_true "$MAP_EXPLORE_REQUIRE_TF_READY"; then
+        echo "Map TF did not become ready; aborting Explore Lite startup in map-explore mode." >&2
+        return 1
+      fi
+      echo "Proceeding to start Explore Lite despite missing map TF; initial planner warnings may occur." >&2
+    fi
     start_explore_lite "start-map-explore" true
   fi
 
@@ -655,6 +709,9 @@ start_stack() {
     echo "Map-and-explore mode active with lidar + odom stack (vSLAM and nvblox disabled)."
     echo "Maps will be saved under: $MAP_DIR"
     echo "Run '$0 save-map <name>' to save (example: $0 save-map office_a)."
+  fi
+  if is_true "$FOXGLOVE_BRIDGE_ENABLED"; then
+    echo "Foxglove websocket: ws://<robot-ip>:${FOXGLOVE_BRIDGE_PORT}"
   fi
   echo "Run '$0 stop' for graceful shutdown."
 }

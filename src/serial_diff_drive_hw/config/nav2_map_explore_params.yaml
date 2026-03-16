@@ -170,12 +170,12 @@ controller_server:
       debug_trajectory_details: False
       min_vel_x: 0.0
       min_vel_y: 0.0
-      max_vel_x: 0.20
+      max_vel_x: 0.24
       max_vel_y: 0.0
       max_vel_theta: 1.0
       # Keep linear commands above drivetrain deadband in map-explore mode.
       min_speed_xy: 0.1
-      max_speed_xy: 0.20
+      max_speed_xy: 0.24
       min_speed_theta: 0.0
       # Add high threshold velocity for turtlebot 3 issue.
       # https://github.com/ROBOTIS-GIT/turtlebot3_simulations/issues/75
@@ -308,7 +308,7 @@ planner_server:
     planner_plugins: ["GridBased"]
     GridBased:
       plugin: "nav2_navfn_planner/NavfnPlanner"
-      tolerance: 0.8
+      tolerance: 1.2
       use_astar: true
       allow_unknown: true
 

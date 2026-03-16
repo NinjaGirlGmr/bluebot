@@ -42,6 +42,14 @@ Set these variables before starting if you want additional stack components:
 export NVBLOX_ENABLED=true
 export NVBLOX_LAUNCH_PKG=serial_diff_drive_hw
 export NVBLOX_LAUNCH_FILE=nvblox_bridge.launch.py
+export BRIDGE_STALL_COMPENSATION_ENABLED=true
+export BRIDGE_MIN_EFFECTIVE_LINEAR_MPS=0.14
+export BRIDGE_MIN_EFFECTIVE_ANGULAR_RAD_S=0.0
+export BRIDGE_ZERO_CMD_EPSILON=0.0001
+export FOXGLOVE_BRIDGE_ENABLED=true
+export FOXGLOVE_BRIDGE_PORT=8765
+export FOXGLOVE_BRIDGE_ADDRESS=0.0.0.0
+export FOXGLOVE_BRIDGE_CAPABILITIES='[clientPublish,services,connectionGraph,assets]'
 export EXPLORE_LITE_ENABLED=true
 export EXPLORE_LITE_NAMESPACE=
 export EXPLORE_LITE_USE_SIM_TIME=false
@@ -49,10 +57,18 @@ export EXPLORE_LITE_USE_SIM_TIME=false
 
 Notes:
 - `NVBLOX_ENABLED` launches an nvblox perception node alongside the existing stack using the existing RealSense streams.
+- `BRIDGE_STALL_COMPENSATION_ENABLED` enforces minimum non-zero drive commands to help overcome drivetrain static friction/stall deadband.
+- `BRIDGE_MIN_EFFECTIVE_LINEAR_MPS` and `BRIDGE_MIN_EFFECTIVE_ANGULAR_RAD_S` set those minimum effective non-zero command magnitudes. Keep angular at `0.0` unless rotation stall is proven.
+- `BRIDGE_ZERO_CMD_EPSILON` defines what counts as a true zero command (to avoid creeping).
+- `FOXGLOVE_BRIDGE_ENABLED` controls whether `foxglove_bridge` is started (default `true`).
+- `FOXGLOVE_BRIDGE_PORT` and `FOXGLOVE_BRIDGE_ADDRESS` control websocket bind settings (defaults `8765` and `0.0.0.0`).
+- `FOXGLOVE_BRIDGE_CAPABILITIES` controls bridge capabilities; default omits parameter browsing to avoid noisy parameter-service timeout logs under load.
 - `EXPLORE_LITE_ENABLED` launches frontier exploration in `start-map` and `start-nav`.
 - `NVBLOX_USE_SIM_TIME` and `EXPLORE_LITE_USE_SIM_TIME` default to the current `NAV2_USE_SIM_TIME` value.
 - `start-map-explore` forces Explore Lite on and disables RealSense/vSLAM/nvblox to run on lidar + odom only.
-- `start-map-explore` now waits `MAP_EXPLORE_LITE_START_DELAY_SEC` (default `10`) after Nav2 is ready before launching Explore Lite.
+- `start-map-explore` now waits `MAP_EXPLORE_LITE_START_DELAY_SEC` (default `20`) after Nav2 is ready before launching Explore Lite.
+- `start-map-explore` waits up to `MAP_EXPLORE_TF_READY_TIMEOUT_SEC` (default `90`) for `map -> base_link` TF before launching Explore Lite.
+- `start-map-explore` aborts Explore Lite startup if `map -> base_link` TF never appears (`MAP_EXPLORE_REQUIRE_TF_READY=true` by default).
 - `start-map-explore` routes drive commands directly from Nav2 (`/cmd_vel`) to the serial bridge (no `/cmd_vel_safe` gate in this mode).
 - `start-map-explore` uses tuned Nav2 map-explore parameters (more tolerant progress checker and lower controller/planner load targets) to reduce false `Failed to make progress` aborts on Jetson.
 
@@ -75,6 +91,11 @@ cd /ssd
 # robot explores while building map using lidar + odom only
 /ssd/ros2_ws/scripts/bluebot.sh save-map office_a
 ```
+
+Foxglove helper layout for this mode:
+
+- Import: `/ssd/ros2_ws/foxglove/start_map_explore_layout.json`
+- Connect: `ws://<robot-ip>:8765` (or your overridden `FOXGLOVE_BRIDGE_PORT`)
 
 ### Navigation with Saved Map
 
@@ -115,8 +136,16 @@ Send only selected waypoints:
 - `VSLAM_MODE` (default `direct`, options `direct|nitros`)
 - `MAP_DIR` (default `/ssd/maps`)
 - `MAP_TOPIC` (default `/map`)
+- `BRIDGE_STALL_COMPENSATION_ENABLED` (default `true`)
+- `BRIDGE_MIN_EFFECTIVE_LINEAR_MPS` (default `0.14`)
+- `BRIDGE_MIN_EFFECTIVE_ANGULAR_RAD_S` (default `0.0`)
+- `BRIDGE_ZERO_CMD_EPSILON` (default `0.0001`)
 - `NAV2_PARAMS_FILE` (default `/ssd/ros2_ws/src/serial_diff_drive_hw/config/nav2_navigation_params.yaml`)
 - `NAV2_MAP_EXPLORE_PARAMS_FILE` (default `/ssd/ros2_ws/src/serial_diff_drive_hw/config/nav2_map_explore_params.yaml`)
+- `FOXGLOVE_BRIDGE_ENABLED` (default `true`)
+- `FOXGLOVE_BRIDGE_PORT` (default `8765`)
+- `FOXGLOVE_BRIDGE_ADDRESS` (default `0.0.0.0`)
+- `FOXGLOVE_BRIDGE_CAPABILITIES` (default `[clientPublish,services,connectionGraph,assets]`)
 - `FOXGLOVE_WAYPOINT_BRIDGE` (default `true`)
 - `FOXGLOVE_WAYPOINT_TOPIC` (default `/foxglove/waypoints`)
 - `FOXGLOVE_WAYPOINT_FRAME` (default `map`)
@@ -129,7 +158,9 @@ Send only selected waypoints:
 - `EXPLORE_LITE_ENABLED` (default `false`)
 - `EXPLORE_LITE_NAMESPACE` (default empty)
 - `EXPLORE_LITE_USE_SIM_TIME` (default `$NAV2_USE_SIM_TIME`)
-- `MAP_EXPLORE_LITE_START_DELAY_SEC` (default `10`)
+- `MAP_EXPLORE_LITE_START_DELAY_SEC` (default `20`)
+- `MAP_EXPLORE_TF_READY_TIMEOUT_SEC` (default `90`)
+- `MAP_EXPLORE_REQUIRE_TF_READY` (default `true`)
 - `ISAAC_GRID_LOCALIZATION_ENABLED` (default `true`)
 - `ISAAC_GRID_LOCALIZER_LAUNCH_PKG` (default `isaac_nav2_pose_bridge`)
 - `ISAAC_GRID_LOCALIZER_LAUNCH_FILE` (default `isaac_grid_localization_to_nav2.launch.py`)

@@ -2,20 +2,25 @@
   ros__parameters:
     robot_base_frame: base_link
     return_to_init: true
-    # Use the SLAM occupancy grid directly for frontier extraction so
-    # exploration can see raw unknown/free boundaries.
-    costmap_topic: /map
-    costmap_updates_topic: /map_updates
+    # Use Nav2 global costmap for frontier extraction so selected goals
+    # are more likely to be reachable by the active planner/costmap setup.
+    costmap_topic: /global_costmap/costmap
+    costmap_updates_topic: /global_costmap/costmap_updates
     visualize: true
     # Replan quickly so failed goals are reconsidered with fresh frontiers.
     planner_frequency: 0.5
     # Give Nav2 enough time to execute slow motions before blacklisting.
     progress_timeout: 55.0
+    # Re-send the same goal periodically so planner retries don't use
+    # stale goal timestamps when TF buffers roll forward.
+    same_goal_refresh_sec: 8.0
     potential_scale: 3.0
     orientation_scale: 0.0
     gain_scale: 1.0
     transform_tolerance: 0.3
-    # Ignore tiny/noisy frontiers close to obstacles.
-    min_frontier_size: 0.4
-    # Prevent retry loops on nearly-identical failed goals.
-    blacklist_tolerance_cells: 8.0
+    # Ignore tiny/noisy frontiers close to obstacles, but keep sensitivity
+    # high enough to avoid premature "No frontiers found" near startup.
+    min_frontier_size: 0.35
+    # Prevent retry loops on nearly-identical failed goals without
+    # blacklisting large swaths of frontier space.
+    blacklist_tolerance_cells: 4.0

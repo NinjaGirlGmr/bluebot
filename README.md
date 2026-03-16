@@ -74,4 +74,5 @@ Common flows:
 
 - `scripts/README_bluebot.md`: full command reference and operational workflows.
 - `3d_stl/README.md`: STL part inventory.
+- `docs/PARAMETERS.md`: project-specific ROS parameter overrides, grouped by package.
 - `docs/`: additional notes and diagrams.
