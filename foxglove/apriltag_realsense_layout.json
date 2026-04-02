@@ -1,0 +1,151 @@
+{
+  "configById": {
+    "Image!apriltag-rectified": {
+      "cameraState": {
+        "distance": 20,
+        "perspective": true,
+        "phi": 60,
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "targetOffset": [
+          0,
+          0,
+          0
+        ],
+        "targetOrientation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "thetaOffset": 45,
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "scene": {},
+      "transforms": {},
+      "topics": {},
+      "layers": {},
+      "publish": {
+        "type": "point",
+        "poseTopic": "/goal_pose",
+        "pointTopic": "/clicked_point",
+        "poseEstimateTopic": "/initialpose",
+        "poseEstimateXDeviation": 0.5,
+        "poseEstimateYDeviation": 0.5,
+        "poseEstimateThetaDeviation": 0.26179939
+      },
+      "imageMode": {
+        "imageTopic": "/image_rect",
+        "calibrationTopic": "/camera_info_rect"
+      }
+    },
+    "3D!apriltag-detections": {
+      "layers": {
+        "grid-apriltag": {
+          "visible": true,
+          "frameLocked": true,
+          "label": "Grid",
+          "instanceId": "grid-apriltag",
+          "layerId": "foxglove.Grid",
+          "size": 8,
+          "divisions": 16,
+          "lineWidth": 1,
+          "color": "#248eff",
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "order": 1
+        }
+      },
+      "cameraState": {
+        "perspective": true,
+        "distance": 4,
+        "phi": 65,
+        "thetaOffset": 35,
+        "targetOffset": [
+          0,
+          0,
+          0
+        ],
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "targetOrientation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "fovy": 45,
+        "near": 0.2,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "followTf": "camera_link",
+      "scene": {
+        "meshUpAxis": "z_up",
+        "transforms": {
+          "labelSize": 0.12
+        }
+      },
+      "transforms": {
+        "frame:camera_link": {
+          "visible": true
+        },
+        "frame:camera_color_frame": {
+          "visible": true
+        },
+        "frame:camera_color_optical_frame": {
+          "visible": true
+        }
+      },
+      "topics": {
+        "/tag_detections": {
+          "visible": true
+        },
+        "/tf": {
+          "visible": true
+        },
+        "/tf_static": {
+          "visible": true
+        }
+      },
+      "publish": {
+        "type": "point",
+        "poseTopic": "/goal_pose",
+        "pointTopic": "/clicked_point",
+        "poseEstimateTopic": "/initialpose",
+        "poseEstimateXDeviation": 0.5,
+        "poseEstimateYDeviation": 0.5,
+        "poseEstimateThetaDeviation": 0.26179939
+      },
+      "imageMode": {}
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "playbackConfig": {
+    "speed": 1
+  },
+  "layout": {
+    "direction": "row",
+    "first": "Image!apriltag-rectified",
+    "second": "3D!apriltag-detections",
+    "splitPercentage": 42
+  }
+}

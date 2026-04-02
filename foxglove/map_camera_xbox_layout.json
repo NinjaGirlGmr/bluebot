@@ -1,6 +1,51 @@
 {
   "configById": {
-    "3D!bluebot-map-explore": {
+    "Image!bluebot-camera": {
+      "cameraState": {
+        "distance": 20,
+        "perspective": true,
+        "phi": 60,
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "targetOffset": [
+          0,
+          0,
+          0
+        ],
+        "targetOrientation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "thetaOffset": 45,
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "scene": {},
+      "transforms": {},
+      "topics": {},
+      "layers": {},
+      "publish": {
+        "type": "point",
+        "poseTopic": "/goal_pose",
+        "pointTopic": "/clicked_point",
+        "poseEstimateTopic": "/initialpose",
+        "poseEstimateXDeviation": 0.5,
+        "poseEstimateYDeviation": 0.5,
+        "poseEstimateThetaDeviation": 0.26179939
+      },
+      "imageMode": {
+        "imageTopic": "/camera/camera/infra1/image_rect_raw",
+        "calibrationTopic": "/camera/camera/infra1/camera_info"
+      }
+    },
+    "3D!bluebot-map-camera": {
       "layers": {
         "grid-main": {
           "visible": true,
@@ -68,6 +113,9 @@
         },
         "frame:laser": {
           "visible": true
+        },
+        "frame:camera_link": {
+          "visible": true
         }
       },
       "topics": {
@@ -128,5 +176,10 @@
   "playbackConfig": {
     "speed": 1
   },
-  "layout": "3D!bluebot-map-explore"
+  "layout": {
+    "direction": "row",
+    "first": "Image!bluebot-camera",
+    "second": "3D!bluebot-map-camera",
+    "splitPercentage": 34
+  }
 }

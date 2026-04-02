@@ -1,0 +1,233 @@
+{
+  "configById": {
+    "3D!bluebot-mapping-global": {
+      "layers": {
+        "grid-global": {
+          "visible": true,
+          "frameLocked": true,
+          "label": "Grid",
+          "instanceId": "grid-global",
+          "layerId": "foxglove.Grid",
+          "size": 16,
+          "divisions": 32,
+          "lineWidth": 1,
+          "color": "#248eff",
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "order": 1
+        }
+      },
+      "cameraState": {
+        "perspective": true,
+        "distance": 11,
+        "phi": 60,
+        "thetaOffset": 55,
+        "targetOffset": [
+          0,
+          0,
+          0
+        ],
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "targetOrientation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "scene": {
+        "meshUpAxis": "z_up",
+        "transforms": {
+          "labelSize": 0.12
+        }
+      },
+      "transforms": {
+        "frame:map": {
+          "visible": true
+        },
+        "frame:odom": {
+          "visible": true
+        },
+        "frame:base_link": {
+          "visible": true
+        },
+        "frame:laser": {
+          "visible": true
+        },
+        "frame:imu_link": {
+          "visible": true
+        }
+      },
+      "topics": {
+        "/map": {
+          "visible": true
+        },
+        "/scan": {
+          "visible": true,
+          "color": "#00e5ff",
+          "pointSize": 2
+        },
+        "/odom": {
+          "visible": true,
+          "lineWidth": 0.05,
+          "gradient": [
+            "#ffd166ff",
+            "#ffd166ff"
+          ]
+        },
+        "/pose": {
+          "visible": true,
+          "lineWidth": 0.05,
+          "gradient": [
+            "#ef476fff",
+            "#ef476fff"
+          ]
+        },
+        "/slam_toolbox/graph_visualization": {
+          "visible": true
+        },
+        "/slam_toolbox/scan_visualization": {
+          "visible": false
+        },
+        "/slam_toolbox/update": {
+          "visible": false
+        },
+        "/slam_toolbox/feedback": {
+          "visible": false
+        }
+      },
+      "publish": {
+        "type": "pose",
+        "poseTopic": "/goal_pose",
+        "pointTopic": "/clicked_point",
+        "poseEstimateTopic": "/initialpose",
+        "poseEstimateXDeviation": 0.5,
+        "poseEstimateYDeviation": 0.5,
+        "poseEstimateThetaDeviation": 0.26179939
+      },
+      "imageMode": {}
+    },
+    "3D!bluebot-mapping-local": {
+      "layers": {
+        "grid-local": {
+          "visible": true,
+          "frameLocked": true,
+          "label": "Grid",
+          "instanceId": "grid-local",
+          "layerId": "foxglove.Grid",
+          "size": 8,
+          "divisions": 16,
+          "lineWidth": 1,
+          "color": "#248eff",
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "order": 1
+        }
+      },
+      "cameraState": {
+        "perspective": true,
+        "distance": 4,
+        "phi": 70,
+        "thetaOffset": 30,
+        "targetOffset": [
+          0,
+          0,
+          0
+        ],
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "targetOrientation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "fovy": 45,
+        "near": 0.2,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "followTf": "base_link",
+      "scene": {
+        "meshUpAxis": "z_up",
+        "transforms": {
+          "labelSize": 0.1
+        }
+      },
+      "transforms": {
+        "frame:base_link": {
+          "visible": true
+        },
+        "frame:laser": {
+          "visible": true
+        },
+        "frame:imu_link": {
+          "visible": true
+        }
+      },
+      "topics": {
+        "/scan": {
+          "visible": true,
+          "color": "#00e5ff",
+          "pointSize": 3
+        },
+        "/map": {
+          "visible": true
+        },
+        "/odom": {
+          "visible": true
+        },
+        "/pose": {
+          "visible": true
+        }
+      },
+      "publish": {
+        "type": "point",
+        "poseTopic": "/goal_pose",
+        "pointTopic": "/clicked_point",
+        "poseEstimateTopic": "/initialpose",
+        "poseEstimateXDeviation": 0.5,
+        "poseEstimateYDeviation": 0.5,
+        "poseEstimateThetaDeviation": 0.26179939
+      },
+      "imageMode": {}
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "playbackConfig": {
+    "speed": 1
+  },
+  "layout": {
+    "direction": "row",
+    "first": "3D!bluebot-mapping-global",
+    "second": "3D!bluebot-mapping-local",
+    "splitPercentage": 68
+  }
+}

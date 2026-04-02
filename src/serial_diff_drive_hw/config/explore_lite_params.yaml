@@ -1,7 +1,9 @@
 /**:
   ros__parameters:
     robot_base_frame: base_link
-    return_to_init: true
+    # Keep exploring in place; don't auto-return to origin when frontiers
+    # temporarily disappear.
+    return_to_init: false
     # Use Nav2 global costmap for frontier extraction so selected goals
     # are more likely to be reachable by the active planner/costmap setup.
     costmap_topic: /global_costmap/costmap
@@ -11,6 +13,10 @@
     planner_frequency: 0.5
     # Give Nav2 enough time to execute slow motions before blacklisting.
     progress_timeout: 55.0
+    # Allow SLAM/costmap to settle before declaring exploration complete.
+    no_frontier_wait_sec: 45.0
+    # If all candidates are blacklisted, clear once or twice before stopping.
+    max_blacklist_resets: 2
     # Re-send the same goal periodically so planner retries don't use
     # stale goal timestamps when TF buffers roll forward.
     same_goal_refresh_sec: 8.0

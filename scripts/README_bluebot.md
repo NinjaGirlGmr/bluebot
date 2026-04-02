@@ -97,6 +97,38 @@ Foxglove helper layout for this mode:
 - Import: `/ssd/ros2_ws/foxglove/start_map_explore_layout.json`
 - Connect: `ws://<robot-ip>:8765` (or your overridden `FOXGLOVE_BRIDGE_PORT`)
 
+Foxglove helper layout for map + camera + Xbox teleop:
+
+- Import: `/ssd/ros2_ws/foxglove/map_camera_xbox_layout.json`
+- Connect: `ws://<robot-ip>:8765` (or your overridden `FOXGLOVE_BRIDGE_PORT`)
+- If your Xbox controller is connected to the robot host, publish `/joy` with:
+
+```bash
+ros2 run joy joy_node --ros-args -p dev:=/dev/input/js0 -p deadzone:=0.15 -p autorepeat_rate:=30.0
+```
+
+- `bluebot.sh` already runs `teleop_twist_joy` (`/joy -> /cmd_vel`), so controller input starts driving as soon as `/joy` is active.
+- In `start-map-explore`, RealSense is intentionally disabled by default, so the camera panel will be blank unless you re-enable RealSense for that mode.
+
+Remote Mac + USB Xbox controller with `start-map`:
+
+1. Start the robot stack:
+
+```bash
+cd /ssd
+/ssd/ros2_ws/scripts/bluebot.sh start-map
+```
+
+2. On your Mac, open Foxglove Desktop and connect to `ws://<robot-ip>:8765`.
+3. Import `/ssd/ros2_ws/foxglove/map_camera_xbox_layout.json` into Foxglove.
+4. In Foxglove Desktop, install the `Joystick/gamepad control` extension from the Extension Marketplace.
+5. Add a Joystick panel in `Gamepad` mode and set the output topic to `/joy`.
+6. Keep `teleop_twist_joy` in the robot stack (already started by `bluebot.sh`) to convert `/joy` to `/cmd_vel`.
+
+Notes:
+- `start-map` keeps RealSense enabled, so this layout’s camera panel should show `/camera/camera/infra1/image_rect_raw`.
+- If teleop does not move the robot, check that `FOXGLOVE_BRIDGE_CAPABILITIES` includes `clientPublish` (default already does).
+
 ### Navigation with Saved Map
 
 ```bash
@@ -105,6 +137,26 @@ cd /ssd
 ```
 
 After `start-nav`, Bluebot now auto-triggers Isaac occupancy-grid localization and publishes an initial pose on `/initialpose`. Then send goals on `/goal_pose` or waypoint arrays on `/foxglove/waypoints`.
+
+Foxglove-first helper wrapper:
+
+```bash
+/ssd/ros2_ws/scripts/bluebot_nav.sh start office_a
+```
+
+- Connect Foxglove Desktop to `ws://<robot-ip>:8765`
+- Import `/ssd/ros2_ws/foxglove/bluebot_nav_layout.json`
+- Use `3D -> Publish -> Pose` to place goals on `/goal_pose`
+
+Optional custom panel for Nav2 controls/status:
+
+```bash
+cd /ssd/ros2_ws/foxglove/bluebot_nav2_extension
+npm install
+npm run local-install
+```
+
+Then add `BlueBot Nav2 Controls` panel in Foxglove Desktop.
 
 ## Waypoints
 

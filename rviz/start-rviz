@@ -12,15 +12,19 @@ case "$selected_config" in
   map-explore)
     rviz_config="/ssd/ros2_ws/rviz/my_house_map_explore.rviz"
     ;;
+  mapper)
+    rviz_config="/ssd/ros2_ws/rviz/bluebot_mapper.rviz"
+    ;;
   *)
     rviz_config="$selected_config"
     ;;
 esac
 
 if [[ ! -f "$rviz_config" ]]; then
-  echo "Usage: $0 [nav|map-explore|path_to_config]"
+  echo "Usage: $0 [nav|map-explore|mapper|path_to_config]"
   echo "  nav (default): use /ssd/ros2_ws/rviz/my_house_nav.rviz"
   echo "  map-explore:   use /ssd/ros2_ws/rviz/my_house_map_explore.rviz"
+  echo "  mapper:        use /ssd/ros2_ws/rviz/bluebot_mapper.rviz"
   exit 1
 fi
 

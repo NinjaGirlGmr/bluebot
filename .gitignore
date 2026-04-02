@@ -12,6 +12,9 @@ start_stack.sh
 # Keep only selected files under scripts/
 scripts/*
 !scripts/bluebot.sh
+!scripts/bluebot_nav.sh
+!scripts/bluebot_v2.sh
+!scripts/bluebot_mapper.sh
 !scripts/*.md
 !scripts/wifi_mode_switch.py
 !scripts/wifi_mode_switch.service
