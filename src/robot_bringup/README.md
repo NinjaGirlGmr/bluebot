@@ -81,6 +81,23 @@ Available modes:
 - `health`
 - `observability`
 
+## Foxglove Templates
+
+New tabbed Foxglove layouts for `robot_bringup`:
+
+- Mapping template:
+  - `/ssd/ros2_ws/foxglove/robot_bringup_mapping_layout.json`
+  - Tabs:
+    - `Mapping + AprilTag` (map creation, scan, odom, AprilTag detections, pose updates)
+    - `Health + Logs` (diagnostics summary/detail, drive metrics, `/rosout`)
+
+- Navigation template:
+  - `/ssd/ros2_ws/foxglove/robot_bringup_navigation_layout.json`
+  - Tabs:
+    - `Navigation + Landmarks` (map/plans, AMCL, AprilTag detections and landmark topic if published)
+    - `Behavior Tree` (behavior-focused logs, Nav2 action status, motion response metrics)
+    - `Health + Logs` (diagnostics summary/detail, drive metrics, `/rosout`)
+
 ## Common Workflows
 
 ### Mapping (with optional AprilTag landmark recording)
