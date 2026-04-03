@@ -1,0 +1,6 @@
+udp_cmd_vel_bridge:
+  ros__parameters:
+    listen_host: 0.0.0.0
+    listen_port: 8766
+    cmd_vel_topic: /cmd_vel
+    timeout_s: 0.5

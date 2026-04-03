@@ -12,6 +12,8 @@ MAP_SAVE_TIMEOUT_SEC="${MAP_SAVE_TIMEOUT_SEC:-15.0}"
 MAP_OCCUPIED_THRESH="${MAP_OCCUPIED_THRESH:-0.65}"
 MAP_FREE_THRESH="${MAP_FREE_THRESH:-0.25}"
 MAP_IMAGE_FORMAT="${MAP_IMAGE_FORMAT:-pgm}"
+APRILTAG_LANDMARKS_FILE="${APRILTAG_LANDMARKS_FILE:-/tmp/apriltag_map_landmarks.yaml}"
+APRILTAG_LANDMARKS_SAVE_ENABLED="${APRILTAG_LANDMARKS_SAVE_ENABLED:-true}"
 LIDAR_SCAN_FREQUENCY="${LIDAR_SCAN_FREQUENCY:-6.0}"
 LIDAR_ANGLE_COMPENSATE="${LIDAR_ANGLE_COMPENSATE:-false}"
 LIDAR_SCAN_MODE="${LIDAR_SCAN_MODE:-}"
@@ -978,6 +980,20 @@ save_map() {
     echo "Map save failed: no map message received from '$MAP_TOPIC' before timeout (${MAP_SAVE_TIMEOUT_SEC}s)."
     echo "Ensure mapping is active and SLAM is publishing map updates, then retry."
     return 1
+  fi
+
+  if [[ "${APRILTAG_LANDMARKS_SAVE_ENABLED,,}" == "true" ]]; then
+    local apriltag_dst="${map_path}.apriltags.yaml"
+    if [[ -s "$APRILTAG_LANDMARKS_FILE" ]]; then
+      if cp "$APRILTAG_LANDMARKS_FILE" "$apriltag_dst"; then
+        echo "Saved AprilTag landmarks to ${apriltag_dst}"
+      else
+        echo "Warning: failed to copy AprilTag landmarks to ${apriltag_dst}"
+      fi
+    else
+      echo "AprilTag landmarks not copied (missing or empty): $APRILTAG_LANDMARKS_FILE"
+      echo "Enable apriltag recorder during mapping or set APRILTAG_LANDMARKS_FILE."
+    fi
   fi
 }
 

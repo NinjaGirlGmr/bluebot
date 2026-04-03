@@ -1,0 +1,10 @@
+imu_node:
+  ros__parameters:
+    source_topics:
+      - /imu/data
+      - /imu
+    publish_rate: 50.0
+    raw_topic: /imu/data_raw
+    orientation_topic: /imu/orientation
+    frame_id: imu_link
+    fallback_publish: false

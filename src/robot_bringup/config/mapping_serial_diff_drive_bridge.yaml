@@ -1,0 +1,22 @@
+serial_diff_drive_bridge:
+  ros__parameters:
+    port: /dev/arduino
+    baud: 115200
+    cmd_vel_topic: /cmd_vel_compensated
+    joint_state_topic: /joint_states
+    odom_topic: /odom_raw
+    raw_state_topic: /robot_serial_state
+    base_frame_id: base_link
+    odom_frame_id: odom
+    left_wheel_joint: left_wheel_joint
+    right_wheel_joint: right_wheel_joint
+    publish_tf: false
+    cmd_repeat_hz: 20.0
+    cmd_timeout_sec: 0.5
+    max_linear_mps: 1.5
+    max_angular_rad_s: 6.0
+    enable_stall_compensation: false
+    min_effective_linear_mps: 0.0
+    min_effective_angular_rad_s: 0.0
+    zero_cmd_epsilon: 0.0001
+    serial_poll_hz: 200.0

@@ -1,0 +1,27 @@
+health_monitor:
+  ros__parameters:
+    publish_rate_hz: 1.0
+    topic_grace_period_sec: 15.0
+    node_grace_period_sec: 30.0
+    hardware_id: robot_bringup_apriltag
+
+    topic_names:
+      - /camera/camera/color/image_raw
+      - /camera/camera/color/camera_info
+      - /tag_detections
+      - /diagnostics
+    topic_types:
+      - sensor_msgs/msg/Image
+      - sensor_msgs/msg/CameraInfo
+      - isaac_ros_apriltag_interfaces/msg/AprilTagDetectionArray
+      - diagnostic_msgs/msg/DiagnosticArray
+    topic_timeouts_sec:
+      - 3.0
+      - 3.0
+      - 3.0
+      - 3.0
+
+    expected_nodes:
+      - health_monitor
+      - apriltag_container
+      - /camera/camera

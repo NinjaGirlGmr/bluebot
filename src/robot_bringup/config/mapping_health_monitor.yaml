@@ -1,0 +1,50 @@
+health_monitor:
+  ros__parameters:
+    publish_rate_hz: 1.0
+    topic_grace_period_sec: 15.0
+    node_grace_period_sec: 30.0
+    hardware_id: robot_bringup_mapping
+
+    topic_names:
+      - /scan
+      - /imu/data_raw
+      - /imu/orientation
+      - /odom_raw
+      - /odom
+      - /map
+      - /cmd_vel
+      - /cmd_vel_compensated
+      - /diagnostics
+    topic_types:
+      - sensor_msgs/msg/LaserScan
+      - sensor_msgs/msg/Imu
+      - sensor_msgs/msg/Imu
+      - nav_msgs/msg/Odometry
+      - nav_msgs/msg/Odometry
+      - nav_msgs/msg/OccupancyGrid
+      - geometry_msgs/msg/Twist
+      - geometry_msgs/msg/Twist
+      - diagnostic_msgs/msg/DiagnosticArray
+    topic_timeouts_sec:
+      - 2.0
+      - 2.0
+      - 2.0
+      - 3.0
+      - 3.0
+      - 5.0
+      - 5.0
+      - 5.0
+      - 3.0
+
+    expected_nodes:
+      - health_monitor
+      - rplidar_node
+      - a471_serial_node
+      - imu_node
+      - serial_diff_drive_bridge
+      - controller_manager
+      - robot_state_publisher
+      - robot_localization_filter
+      - straight_line_compensator
+      - slam_toolbox
+      - udp_cmd_vel_bridge

@@ -1,0 +1,54 @@
+health_monitor:
+  ros__parameters:
+    publish_rate_hz: 1.0
+    topic_grace_period_sec: 15.0
+    node_grace_period_sec: 30.0
+    hardware_id: robot_bringup_nav2
+
+    topic_names:
+      - /scan
+      - /odom_raw
+      - /odom
+      - /amcl_pose
+      - /plan
+      - /cmd_vel
+      - /cmd_vel_compensated
+      - /diagnostics
+    topic_types:
+      - sensor_msgs/msg/LaserScan
+      - nav_msgs/msg/Odometry
+      - nav_msgs/msg/Odometry
+      - geometry_msgs/msg/PoseWithCovarianceStamped
+      - nav_msgs/msg/Path
+      - geometry_msgs/msg/Twist
+      - geometry_msgs/msg/Twist
+      - diagnostic_msgs/msg/DiagnosticArray
+    topic_timeouts_sec:
+      - 2.0
+      - 3.0
+      - 3.0
+      - 3.0
+      - 5.0
+      - 5.0
+      - 5.0
+      - 3.0
+
+    expected_nodes:
+      - health_monitor
+      - serial_diff_drive_bridge
+      - controller_manager
+      - robot_state_publisher
+      - robot_localization_filter
+      - straight_line_compensator
+      - udp_cmd_vel_bridge
+      - map_server
+      - amcl
+      - planner_server
+      - smoother_server
+      - controller_server
+      - bt_navigator
+      - behavior_server
+      - waypoint_follower
+      - velocity_smoother
+      - lifecycle_manager_localization
+      - lifecycle_manager_navigation

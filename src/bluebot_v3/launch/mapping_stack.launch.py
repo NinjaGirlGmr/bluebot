@@ -5,7 +5,7 @@ from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
-from launch_ros.actions import Node
+from launch_ros.actions import Node, SetParameter
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
@@ -79,6 +79,10 @@ def generate_launch_description() -> LaunchDescription:
     default_ekf_params = PathJoinSubstitution(
         [FindPackageShare("bluebot_v3"), "config", "ekf_mapping.yaml"]
     )
+    set_use_sim_time = SetParameter(
+        name="use_sim_time",
+        value=ParameterValue(use_sim_time, value_type=bool),
+    )
 
     bridge_node = Node(
         package="ros2_serial_diff_drive_bridge",
@@ -112,6 +116,7 @@ def generate_launch_description() -> LaunchDescription:
             "scan_frequency": lidar_scan_frequency,
             "angle_compensate": lidar_angle_compensate,
             "scan_mode": lidar_scan_mode,
+            "use_sim_time": use_sim_time,
             "tf_x": lidar_tf_x,
             "tf_y": lidar_tf_y,
             "tf_z": lidar_tf_z,
@@ -313,6 +318,7 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument("straight_comp_reset_on_reverse", default_value="true"),
             DeclareLaunchArgument("slam_params_file", default_value=default_slam_params),
             DeclareLaunchArgument("ekf_params_file", default_value=default_ekf_params),
+            set_use_sim_time,
             bridge_node,
             lidar_launch,
             a471_serial_node,

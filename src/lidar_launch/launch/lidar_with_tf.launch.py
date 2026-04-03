@@ -2,6 +2,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
@@ -17,6 +18,7 @@ def generate_launch_description():
     tf_roll = LaunchConfiguration("tf_roll")
     tf_pitch = LaunchConfiguration("tf_pitch")
     tf_yaw = LaunchConfiguration("tf_yaw")
+    use_sim_time = LaunchConfiguration("use_sim_time")
 
     declare_serial_port = DeclareLaunchArgument("serial_port", default_value="/dev/lidar")
     declare_frame_id = DeclareLaunchArgument("frame_id", default_value="laser")
@@ -31,6 +33,7 @@ def generate_launch_description():
     declare_tf_roll = DeclareLaunchArgument("tf_roll", default_value="0.0")
     declare_tf_pitch = DeclareLaunchArgument("tf_pitch", default_value="0.0")
     declare_tf_yaw = DeclareLaunchArgument("tf_yaw", default_value="0.0")
+    declare_use_sim_time = DeclareLaunchArgument("use_sim_time", default_value="false")
 
     rplidar_node = Node(
         package='rplidar_ros',
@@ -44,6 +47,7 @@ def generate_launch_description():
             'angle_compensate': angle_compensate,
             'scan_mode': scan_mode,
             'inverted': False,
+            'use_sim_time': ParameterValue(use_sim_time, value_type=bool),
         }],
         output='screen'
     )
@@ -60,7 +64,10 @@ def generate_launch_description():
             '--yaw', tf_yaw,
             '--frame-id', parent_frame,
             '--child-frame-id', frame_id
-        ]
+        ],
+        parameters=[{
+            'use_sim_time': ParameterValue(use_sim_time, value_type=bool),
+        }],
     )
 
     return LaunchDescription([
@@ -76,6 +83,7 @@ def generate_launch_description():
         declare_tf_roll,
         declare_tf_pitch,
         declare_tf_yaw,
+        declare_use_sim_time,
         rplidar_node,
         static_tf
     ])

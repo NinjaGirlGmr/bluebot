@@ -1,0 +1,7 @@
+isaac_ros_apriltag:
+  ros__parameters:
+    size: 0.10
+    max_tags: 32
+    tile_size: 4
+    tag_family: tag36h11
+    backends: CUDA

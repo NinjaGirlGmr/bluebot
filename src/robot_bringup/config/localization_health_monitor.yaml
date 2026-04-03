@@ -1,0 +1,23 @@
+health_monitor:
+  ros__parameters:
+    publish_rate_hz: 1.0
+    topic_grace_period_sec: 10.0
+    node_grace_period_sec: 20.0
+    hardware_id: robot_bringup_localization
+
+    topic_names:
+      - /map
+      - /tf
+      - /diagnostics
+    topic_types:
+      - nav_msgs/msg/OccupancyGrid
+      - tf2_msgs/msg/TFMessage
+      - diagnostic_msgs/msg/DiagnosticArray
+    topic_timeouts_sec:
+      - 5.0
+      - 2.0
+      - 3.0
+
+    expected_nodes:
+      - health_monitor
+      - slam_toolbox

@@ -44,6 +44,9 @@ def generate_launch_description():
         package="tf2_ros",
         executable="static_transform_publisher",
         name="base_to_imu_tf",
+        parameters=[{
+            "use_sim_time": use_sim_time,
+        }],
         arguments=[
             "0", "0", "0", "0", "0", "0",
             "base_link", "imu_link",

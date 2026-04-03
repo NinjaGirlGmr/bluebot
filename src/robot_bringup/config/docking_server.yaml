@@ -1,0 +1,12 @@
+apriltag_nav_behavior_tree:
+  ros__parameters:
+    lifecycle_manager_service: /lifecycle_manager_navigation/manage_nodes
+    docking_default_timeout_sec: 12.0
+    docking_default_target_range_m: 0.30
+    docking_default_linear_x: -0.08
+    docking_default_angular_z: 0.0
+    docking_sleep_duration_sec: 15.0
+    docking_pause_nav2: true
+    docking_lidar_power_control_enabled: true
+    lidar_stop_motor_service: /stop_motor
+    lidar_start_motor_service: /start_motor

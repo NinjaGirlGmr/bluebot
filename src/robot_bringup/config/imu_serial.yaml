@@ -1,0 +1,8 @@
+a471_serial_node:
+  ros__parameters:
+    port: /dev/myimu
+    baud: 115200
+    frame_id: imu_link
+    imu_topic: /imu/data
+    publish_legacy_imu_topic: true
+    legacy_imu_topic: /imu

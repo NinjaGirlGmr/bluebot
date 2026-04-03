@@ -1,0 +1,12 @@
+enable_color: true
+enable_depth: false
+enable_infra: false
+enable_infra1: false
+enable_infra2: false
+enable_gyro: false
+enable_accel: false
+pointcloud.enable: false
+align_depth.enable: false
+publish_tf: true
+rgb_camera.color_profile: "640,480,30"
+rgb_camera.color_format: "RGB8"

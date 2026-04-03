@@ -1,0 +1,19 @@
+lidar_tf:
+  parent_frame: base_link
+  child_frame: laser
+  x: 0.0
+  y: 0.0
+  z: 0.199
+  roll: 0.0
+  pitch: 0.0
+  yaw: 0.0
+
+imu_tf:
+  parent_frame: base_link
+  child_frame: imu_link
+  x: 0.0
+  y: 0.0
+  z: 0.0
+  roll: 0.0
+  pitch: 0.0
+  yaw: 0.0
