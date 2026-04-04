@@ -26,6 +26,15 @@ def generate_launch_description() -> LaunchDescription:
     output = LaunchConfiguration("output")
     color_image_topic = LaunchConfiguration("color_image_topic")
     color_camera_info_topic = LaunchConfiguration("color_camera_info_topic")
+    publish_base_to_camera_tf = LaunchConfiguration("publish_base_to_camera_tf")
+    camera_parent_frame = LaunchConfiguration("camera_parent_frame")
+    camera_base_frame = LaunchConfiguration("camera_base_frame")
+    camera_tf_x = LaunchConfiguration("camera_tf_x")
+    camera_tf_y = LaunchConfiguration("camera_tf_y")
+    camera_tf_z = LaunchConfiguration("camera_tf_z")
+    camera_tf_roll = LaunchConfiguration("camera_tf_roll")
+    camera_tf_pitch = LaunchConfiguration("camera_tf_pitch")
+    camera_tf_yaw = LaunchConfiguration("camera_tf_yaw")
 
     apriltag_params = PathJoinSubstitution(
         [FindPackageShare("robot_bringup"), "config", "apriltag.yaml"]
@@ -92,6 +101,33 @@ def generate_launch_description() -> LaunchDescription:
         output="screen",
     )
 
+    base_to_camera_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="base_to_camera_tf",
+        condition=IfCondition(publish_base_to_camera_tf),
+        parameters=[{"use_sim_time": ParameterValue(use_sim_time, value_type=bool)}],
+        arguments=[
+            "--x",
+            camera_tf_x,
+            "--y",
+            camera_tf_y,
+            "--z",
+            camera_tf_z,
+            "--roll",
+            camera_tf_roll,
+            "--pitch",
+            camera_tf_pitch,
+            "--yaw",
+            camera_tf_yaw,
+            "--frame-id",
+            camera_parent_frame,
+            "--child-frame-id",
+            camera_base_frame,
+        ],
+        output="screen",
+    )
+
     health_monitor = Node(
         package="robot_bringup",
         executable="health_monitor",
@@ -120,7 +156,7 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument("max_tags", default_value="24"),
             DeclareLaunchArgument("tag_family", default_value="tag36h11"),
             DeclareLaunchArgument("backends", default_value="CUDA"),
-            DeclareLaunchArgument("use_sim_time", default_value="true"),
+            DeclareLaunchArgument("use_sim_time", default_value="false"),
             DeclareLaunchArgument("health_monitor_enabled", default_value="true"),
             DeclareLaunchArgument(
                 "health_params_file",
@@ -135,7 +171,17 @@ def generate_launch_description() -> LaunchDescription:
                 "color_camera_info_topic",
                 default_value="/camera/camera/color/camera_info",
             ),
+            DeclareLaunchArgument("publish_base_to_camera_tf", default_value="true"),
+            DeclareLaunchArgument("camera_parent_frame", default_value="base_link"),
+            DeclareLaunchArgument("camera_base_frame", default_value="camera_link"),
+            DeclareLaunchArgument("camera_tf_x", default_value="0.097"),
+            DeclareLaunchArgument("camera_tf_y", default_value="0.0"),
+            DeclareLaunchArgument("camera_tf_z", default_value="0.155"),
+            DeclareLaunchArgument("camera_tf_roll", default_value="0.0"),
+            DeclareLaunchArgument("camera_tf_pitch", default_value="0.0"),
+            DeclareLaunchArgument("camera_tf_yaw", default_value="0.0"),
             set_use_sim_time,
+            base_to_camera_tf,
             apriltag_container,
             health_monitor,
         ]

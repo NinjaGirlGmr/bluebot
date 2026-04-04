@@ -55,8 +55,8 @@ rules:
     cooldown_sec: 20.0
     priority: 180
 
-  - name: relocalize_on_tag_11
-    tag_id: 11
+  - name: relocalize_on_tag_2
+    tag_id: 2
     action: set_initial_pose
     use_landmark_pose: true
     frame_id: map
@@ -66,8 +66,8 @@ rules:
     cooldown_sec: 20.0
     priority: 180
 
-  - name: relocalize_on_tag_12
-    tag_id: 12
+  - name: relocalize_on_tag_3
+    tag_id: 3
     action: set_initial_pose
     use_landmark_pose: true
     frame_id: map
@@ -82,3 +82,36 @@ rules:
     action: cancel_navigation
     cooldown_sec: 5.0
     priority: 120
+
+  - name: relocalize_on_tag_5
+    tag_id: 5
+    action: set_initial_pose
+    use_landmark_pose: true
+    frame_id: map
+    max_range_m: 1.5
+    covariance_xy: 0.25
+    covariance_yaw: 0.0685
+    cooldown_sec: 20.0
+    priority: 180
+
+  - name: relocalize_on_tag_19
+    tag_id: 19
+    action: set_initial_pose
+    use_landmark_pose: true
+    frame_id: map
+    max_range_m: 1.5
+    covariance_xy: 0.25
+    covariance_yaw: 0.0685
+    cooldown_sec: 20.0
+    priority: 180
+
+  - name: relocalize_on_tag_20
+    tag_id: 20
+    action: set_initial_pose
+    use_landmark_pose: true
+    frame_id: map
+    max_range_m: 1.5
+    covariance_xy: 0.25
+    covariance_yaw: 0.0685
+    cooldown_sec: 20.0
+    priority: 180

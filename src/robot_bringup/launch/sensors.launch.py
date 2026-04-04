@@ -159,7 +159,7 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument("publish_lidar_tf", default_value="true"),
             DeclareLaunchArgument("publish_imu_tf", default_value="true"),
-            DeclareLaunchArgument("use_sim_time", default_value="true"),
+            DeclareLaunchArgument("use_sim_time", default_value="false"),
             DeclareLaunchArgument("health_monitor_enabled", default_value="true"),
             DeclareLaunchArgument(
                 "health_params_file",

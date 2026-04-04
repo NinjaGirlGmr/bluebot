@@ -233,7 +233,7 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     return LaunchDescription([
-        DeclareLaunchArgument('use_sim_time', default_value='true'),
+        DeclareLaunchArgument('use_sim_time', default_value='false'),
         DeclareLaunchArgument('sensors_enabled', default_value='true'),
         DeclareLaunchArgument(
             'lidar_params_file',

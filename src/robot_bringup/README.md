@@ -50,8 +50,12 @@ source /ssd/ros2_ws/install/setup.bash
 All launch files default to:
 
 ```bash
-use_sim_time:=true
+use_sim_time:=false
 ```
+
+Hardware note:
+- Keep `use_sim_time:=false` unless you actively publish `/clock`.
+- If `use_sim_time:=true` and `/clock` has no publishers, timer-driven nodes can appear alive but stop publishing data (for example `/odom`).
 
 Inspect launch arguments:
 
@@ -110,6 +114,23 @@ ros2 launch robot_bringup mapping.launch.py \
   apriltag_map_output_yaml:=/tmp/apriltag_map_landmarks.yaml
 ```
 
+AprilTag recorder requirements:
+- `apriltag_map_recorder_enabled:=true`
+- a valid TF chain from `map` to camera optical frame (for example `camera_color_optical_frame`)
+- sufficient observations (`min_observations` in `config/apriltag_map_recorder.yaml`, default `3`)
+
+`apriltag_realsense.launch.py` now publishes a static TF from `base_link` to `camera_link` by default:
+- `publish_base_to_camera_tf:=true`
+- default mount transform: `x=0.097`, `y=0.0`, `z=0.155`, `roll/pitch/yaw=0.0`
+
+Override camera mount if needed:
+
+```bash
+ros2 launch robot_bringup apriltag_realsense.launch.py \
+  camera_tf_x:=0.097 camera_tf_y:=0.0 camera_tf_z:=0.155 \
+  camera_tf_roll:=0.0 camera_tf_pitch:=0.0 camera_tf_yaw:=0.0
+```
+
 Save map and copy landmark snapshot beside it:
 
 ```bash
@@ -155,6 +176,15 @@ Drive command path:
 Main tuning files:
 - `config/state_estimation_drift.yaml`
 - `config/straight_line_compensator.yaml`
+
+Current straight-line defaults are tuned for startup stability and right-pull correction:
+- `angular_deadband: 0.08`
+- `kp: 2.2`
+- `ki: 0.04`
+- `kd: 0.20`
+- `max_angular_correction: 0.65`
+- `startup_holdoff_sec: 1.5`
+- `min_odom_samples_before_comp: 10`
 
 ## AprilTag Behavior Tree
 
@@ -279,5 +309,17 @@ Health profile configs:
   - `ros2 topic list`
 - Check diagnostics:
   - `ros2 topic echo /diagnostics`
+- Check simulation time wiring:
+  - `ros2 topic info -v /clock` (publisher count should be `> 0` when `use_sim_time:=true`)
+  - `ros2 param get /serial_diff_drive_bridge use_sim_time`
+  - `ros2 param get /robot_localization_filter use_sim_time`
+- If `/odom` is empty but nodes exist:
+  - verify `/clock` publisher status
+  - verify `/odom_raw` and `/odom` rates: `ros2 topic hz /odom_raw` and `ros2 topic hz /odom`
+- If AprilTag map save writes `tags: []`:
+  - ensure mapping ran with `apriltag_realsense_enabled:=true` and `apriltag_map_recorder_enabled:=true`
+  - check recorder logs for TF errors like `Failed transform camera_color_optical_frame->map`
+  - verify TF chain: `ros2 run tf2_ros tf2_echo map camera_color_optical_frame`
+  - lower `min_observations` in `config/apriltag_map_recorder.yaml` for sparse passes
 - If you see `file 'X.launch.py' was not found`, verify spelling and `setup.py` includes `launch/*.launch.py` in `data_files`.
 - `PkgResourcesDeprecationWarning` during `colcon build` is non-fatal in this workspace.

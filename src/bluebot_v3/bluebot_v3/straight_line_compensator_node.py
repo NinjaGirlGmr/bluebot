@@ -55,6 +55,8 @@ class StraightLineCompensatorNode(Node):
 
         self.declare_parameter("odom_timeout_sec", 0.40)
         self.declare_parameter("reset_heading_on_reverse", True)
+        self.declare_parameter("startup_holdoff_sec", 1.5)
+        self.declare_parameter("min_odom_samples_before_comp", 10)
 
         self.input_cmd_topic = str(self.get_parameter("input_cmd_topic").value)
         self.output_cmd_topic = str(self.get_parameter("output_cmd_topic").value)
@@ -82,10 +84,16 @@ class StraightLineCompensatorNode(Node):
 
         self.odom_timeout_sec = max(0.05, float(self.get_parameter("odom_timeout_sec").value))
         self.reset_heading_on_reverse = bool(self.get_parameter("reset_heading_on_reverse").value)
+        self.startup_holdoff_sec = max(0.0, float(self.get_parameter("startup_holdoff_sec").value))
+        self.min_odom_samples_before_comp = max(
+            0, int(self.get_parameter("min_odom_samples_before_comp").value)
+        )
 
         self.current_yaw: Optional[float] = None
         self.current_yaw_rate = 0.0
         self.last_odom_time = None
+        self.start_time = self.get_clock().now()
+        self.odom_sample_count = 0
 
         self.hold_active = False
         self.target_yaw = 0.0
@@ -106,7 +114,9 @@ class StraightLineCompensatorNode(Node):
             "Straight-line compensator started: "
             f"input={self.input_cmd_topic}, output={self.output_cmd_topic}, odom={self.odom_topic}, "
             f"enabled={self.enabled}, kp={self.kp:.3f}, ki={self.ki:.3f}, kd={self.kd:.3f}, "
-            f"max_corr={self.max_angular_correction:.3f}, caster_comp={self.caster_comp_enabled}"
+            f"max_corr={self.max_angular_correction:.3f}, caster_comp={self.caster_comp_enabled}, "
+            f"startup_holdoff={self.startup_holdoff_sec:.2f}s, "
+            f"min_odom_samples={self.min_odom_samples_before_comp}"
         )
 
     def on_odom(self, msg: Odometry) -> None:
@@ -114,7 +124,15 @@ class StraightLineCompensatorNode(Node):
         self.current_yaw = yaw_from_quaternion(q.x, q.y, q.z, q.w)
         self.current_yaw_rate = float(msg.twist.twist.angular.z)
         self.last_odom_time = self.get_clock().now()
+        self.odom_sample_count += 1
         self._stale_odom_warned = False
+
+    def in_startup_holdoff(self, now) -> bool:
+        if self.startup_holdoff_sec > 0.0:
+            startup_age = (now - self.start_time).nanoseconds / 1.0e9
+            if startup_age < self.startup_holdoff_sec:
+                return True
+        return self.odom_sample_count < self.min_odom_samples_before_comp
 
     def reset_hold(self) -> None:
         self.hold_active = False
@@ -159,6 +177,11 @@ class StraightLineCompensatorNode(Node):
             if not self._stale_odom_warned:
                 self.get_logger().warn("Odom unavailable/stale; straight-line compensation bypassed")
                 self._stale_odom_warned = True
+            self.cmd_pub.publish(out)
+            return
+
+        if self.in_startup_holdoff(now):
+            self.reset_hold()
             self.cmd_pub.publish(out)
             return
 

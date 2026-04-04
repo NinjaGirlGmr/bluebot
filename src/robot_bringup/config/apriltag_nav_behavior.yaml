@@ -1,6 +1,6 @@
 apriltag_nav_behavior_tree:
   ros__parameters:
-    use_sim_time: true
+    use_sim_time: false
     detections_topic: /tag_detections
     cmd_vel_topic: /cmd_vel
     initial_pose_topic: /initialpose

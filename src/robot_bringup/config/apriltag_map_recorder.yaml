@@ -1,6 +1,6 @@
 apriltag_map_recorder:
   ros__parameters:
-    use_sim_time: true
+    use_sim_time: false
     detections_topic: /tag_detections
     map_frame: map
     output_yaml: /tmp/apriltag_map_landmarks.yaml

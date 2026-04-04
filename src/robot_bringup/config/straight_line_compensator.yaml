@@ -1,19 +1,19 @@
 straight_line_compensator:
   ros__parameters:
-    use_sim_time: true
+    use_sim_time: false
     input_cmd_topic: /cmd_vel
     output_cmd_topic: /cmd_vel_compensated
     odom_topic: /odom_raw
     enabled: true
 
     linear_speed_min: 0.03
-    angular_deadband: 0.05
+    angular_deadband: 0.08
     turn_memory_angular_threshold: 0.20
 
-    kp: 1.8
-    ki: 0.0
+    kp: 2.2
+    ki: 0.04
     kd: 0.20
-    max_angular_correction: 0.50
+    max_angular_correction: 0.65
     integral_limit: 0.40
 
     caster_comp_enabled: true
@@ -25,3 +25,5 @@ straight_line_compensator:
 
     odom_timeout_sec: 0.40
     reset_heading_on_reverse: true
+    startup_holdoff_sec: 1.5
+    min_odom_samples_before_comp: 10
