@@ -73,6 +73,59 @@ Preferred script for `robot_bringup` modes:
 "$ROS_WS/scripts/bluebot_bringup.sh" stop
 ```
 
+Full `bluebot_bringup.sh` command/function reference:
+
+- `scripts/README_bluebot_bringup.md`
+
+## `bluebot_bringup.sh` Command Args
+
+Script path:
+
+```bash
+"$ROS_WS/scripts/bluebot_bringup.sh"
+```
+
+Accepted commands:
+
+```bash
+bluebot_bringup.sh start <mode> [mode args] [extra ros2 launch args...]
+bluebot_bringup.sh stop
+bluebot_bringup.sh restart <mode> [mode args] [extra ros2 launch args...]
+bluebot_bringup.sh status
+bluebot_bringup.sh list-modes
+bluebot_bringup.sh modes
+bluebot_bringup.sh save-map [name]
+```
+
+Modes accepted by `start` and `restart`:
+
+| Mode | Required mode args | Notes |
+| --- | --- | --- |
+| `sensors` | none | Launches `robot_bringup/sensors.launch.py` |
+| `apriltag` | none | Launches `robot_bringup/apriltag_realsense.launch.py` |
+| `mapping` | none | Launches `robot_bringup/mapping.launch.py` |
+| `nav2` | `<map>` | Launches `robot_bringup/nav2.launch.py` |
+| `navigation` | `<map>` | Launches `robot_bringup/navigation.launch.py` |
+| `localization` | none | Launches `robot_bringup/localization.launch.py` |
+| `health` | none | Launches `robot_bringup/health.launch.py` |
+| `observability` | none | Launches `robot_bringup/observability.launch.py` |
+
+`<map>` argument behavior for `nav2` and `navigation`:
+
+- If `<map>` contains `/` or ends in `.yaml`/`.yml`, it is treated as a direct file path.
+- Otherwise it resolves to `$MAP_DIR/<map>.yaml` (`$MAP_DIR` defaults to `/ssd/maps`).
+
+Extra args for `start` and `restart`:
+
+- Any extra trailing args are passed directly to `ros2 launch` (for launch overrides).
+- Example: `"$ROS_WS/scripts/bluebot_bringup.sh" start mapping apriltag_realsense_enabled:=true`
+- Example: `"$ROS_WS/scripts/bluebot_bringup.sh" restart navigation office_a use_sim_time:=true`
+
+`save-map` argument behavior:
+
+- `save-map [name]` accepts an optional map name.
+- If omitted, name defaults to `map_YYYYMMDD_HHMMSS`.
+
 Direct launch usage:
 
 ```bash
@@ -152,6 +205,7 @@ Legacy packages `bluebot_v2` and `bluebot_v3` were removed from this workspace.
 ## Related Documentation
 
 - `src/robot_bringup/README.md`: full package-level launch/config reference.
+- `scripts/README_bluebot_bringup.md`: full `bluebot_bringup.sh` command/function/arg reference.
 - `scripts/README_bluebot.md`: detailed `bluebot.sh` command reference.
 - `scripts/README_bluebot_nav.md`: Foxglove-first nav helper workflow.
 - `docs/PARAMETERS.md`: project parameter overrides.
