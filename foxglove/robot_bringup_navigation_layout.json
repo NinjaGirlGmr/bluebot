@@ -104,20 +104,10 @@
                             "pointSize": 2
                           },
                           "/plan": {
-                            "visible": true,
-                            "lineWidth": 0.04,
-                            "gradient": [
-                              "#ffd166ff",
-                              "#ffd166ff"
-                            ]
+                            "visible": false
                           },
                           "/local_plan": {
-                            "visible": true,
-                            "lineWidth": 0.04,
-                            "gradient": [
-                              "#ef476fff",
-                              "#ef476fff"
-                            ]
+                            "visible": false
                           },
                           "/goal_pose": {
                             "visible": true
@@ -144,6 +134,18 @@
                             "visible": false
                           },
                           "/local_costmap/costmap": {
+                            "visible": true
+                          },
+                          "/odom_raw": {
+                            "visible": true
+                          },
+                          "/cmd_vel": {
+                            "visible": false
+                          },
+                          "/cmd_vel_compensated": {
+                            "visible": false
+                          },
+                          "/local_costmap/costmap_raw": {
                             "visible": false
                           }
                         },
@@ -243,7 +245,7 @@
                             "visible": true
                           },
                           "/local_plan": {
-                            "visible": true
+                            "visible": false
                           },
                           "/goal_pose": {
                             "visible": true
@@ -255,6 +257,12 @@
                             "visible": true
                           },
                           "/apriltag_landmarks": {
+                            "visible": true
+                          },
+                          "/odom_raw": {
+                            "visible": true
+                          },
+                          "/local_costmap/costmap": {
                             "visible": true
                           }
                         },
@@ -283,7 +291,22 @@
                 "direction": "column",
                 "items": [
                   {
-                    "proportion": 0.4,
+                    "proportion": 0.5,
+                    "content": {
+                      "type": "panel",
+                      "panelType": "Image",
+                      "config": {
+                        "imageMode": {
+                          "imageTopic": "/image_rect",
+                          "calibrationTopic": "/camera_info_rect"
+                        }
+                      },
+                      "title": "AprilTag Camera",
+                      "version": 1
+                    }
+                  },
+                  {
+                    "proportion": 0.25,
                     "content": {
                       "type": "panel",
                       "panelType": "RawMessages",
@@ -296,28 +319,15 @@
                     }
                   },
                   {
-                    "proportion": 0.3,
+                    "proportion": 0.25,
                     "content": {
                       "type": "panel",
                       "panelType": "RawMessages",
                       "config": {
                         "defaultExpanded": true,
-                        "topicPath": "/apriltag_landmarks"
+                        "topicPath": "/robot_serial_state"
                       },
-                      "title": "AprilTag Landmarks (if published)",
-                      "version": 1
-                    }
-                  },
-                  {
-                    "proportion": 0.3,
-                    "content": {
-                      "type": "panel",
-                      "panelType": "RawMessages",
-                      "config": {
-                        "defaultExpanded": true,
-                        "topicPath": "/initialpose"
-                      },
-                      "title": "Pose Recalibration Events",
+                      "title": "Drive Serial State",
                       "version": 1
                     }
                   }
@@ -398,9 +408,19 @@
                             "label": "cmd_vel.angular.z"
                           },
                           {
+                            "value": "/cmd_vel_compensated.angular.z",
+                            "color": "#39d353",
+                            "label": "cmd_vel_comp.angular.z"
+                          },
+                          {
                             "value": "/odom.twist.twist.angular.z",
                             "color": "#ff4d6d",
                             "label": "odom.twist.angular.z"
+                          },
+                          {
+                            "value": "/odom_raw.twist.twist.angular.z",
+                            "color": "#c77dff",
+                            "label": "odom_raw.twist.angular.z"
                           }
                         ],
                         "showLegend": true
@@ -499,9 +519,19 @@
                             "label": "cmd_vel_comp.linear.x"
                           },
                           {
+                            "value": "/cmd_vel_compensated.angular.z",
+                            "color": "#2ec4b6",
+                            "label": "cmd_vel_comp.angular.z"
+                          },
+                          {
                             "value": "/odom.twist.twist.angular.z",
                             "color": "#ff4d6d",
                             "label": "odom.twist.angular.z"
+                          },
+                          {
+                            "value": "/odom_raw.twist.twist.angular.z",
+                            "color": "#c77dff",
+                            "label": "odom_raw.twist.angular.z"
                           }
                         ],
                         "showLegend": true

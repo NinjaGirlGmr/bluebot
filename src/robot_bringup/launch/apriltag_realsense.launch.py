@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, GroupAction, IncludeLaunchDescription
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
@@ -43,15 +43,21 @@ def generate_launch_description() -> LaunchDescription:
         [FindPackageShare("realsense2_camera"), "launch", "rs_launch.py"]
     )
 
-    realsense_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(realsense_launch_path),
-        launch_arguments={
+    # Realsense launch script may consume parent launch configurations as ROS params.
+    # Isolate it from parent args (map/nav/etc.) to prevent parameter leakage.
+    realsense_launch = GroupAction(
+        forwarding=False,
+        launch_configurations={
             "config_file": config_file,
             "camera_namespace": camera_namespace,
             "camera_name": camera_name,
             "output": output,
-            "use_sim_time": use_sim_time,
-        }.items(),
+        },
+        actions=[
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(realsense_launch_path),
+            ),
+        ],
     )
 
     set_use_sim_time = SetParameter(

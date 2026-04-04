@@ -321,5 +321,12 @@ Health profile configs:
   - check recorder logs for TF errors like `Failed transform camera_color_optical_frame->map`
   - verify TF chain: `ros2 run tf2_ros tf2_echo map camera_color_optical_frame`
   - lower `min_observations` in `config/apriltag_map_recorder.yaml` for sparse passes
+- If navigation launch fails with `name 'true' is not defined`:
+  - this comes from Nav2 `PythonExpression(['not ', use_composition])` when `use_composition` is lowercase `true/false`
+  - `robot_bringup/launch/nav2.launch.py` now normalizes booleans before including Nav2 bringup
+  - rebuild and relaunch:
+    - `colcon build --packages-select robot_bringup`
+    - `source /ssd/ros2_ws/install/setup.bash`
+    - `ros2 launch robot_bringup navigation.launch.py map:=/ssd/maps/<map>.yaml apriltag_realsense_enabled:=true`
 - If you see `file 'X.launch.py' was not found`, verify spelling and `setup.py` includes `launch/*.launch.py` in `data_files`.
 - `PkgResourcesDeprecationWarning` during `colcon build` is non-fatal in this workspace.

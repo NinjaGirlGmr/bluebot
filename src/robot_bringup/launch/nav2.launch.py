@@ -2,10 +2,20 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
 from launch_ros.actions import Node, SetParameter
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
+
+
+def _to_python_bool(value):
+    return PythonExpression(
+        [
+            '"True" if "',
+            value,
+            '".strip().lower() in ["true", "1", "yes", "on"] else "False"',
+        ]
+    )
 
 
 def generate_launch_description():
@@ -58,6 +68,11 @@ def generate_launch_description():
         name='use_sim_time',
         value=ParameterValue(use_sim_time, value_type=bool),
     )
+
+    nav2_use_sim_time = _to_python_bool(use_sim_time)
+    nav2_autostart = _to_python_bool(autostart)
+    nav2_use_composition = _to_python_bool(use_composition)
+    nav2_use_respawn = _to_python_bool(use_respawn)
 
     serial_bridge = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -165,11 +180,11 @@ def generate_launch_description():
         launch_arguments={
             'slam': 'False',
             'map': map_file,
-            'use_sim_time': use_sim_time,
+            'use_sim_time': nav2_use_sim_time,
             'params_file': params_file,
-            'autostart': autostart,
-            'use_composition': use_composition,
-            'use_respawn': use_respawn,
+            'autostart': nav2_autostart,
+            'use_composition': nav2_use_composition,
+            'use_respawn': nav2_use_respawn,
             'log_level': log_level,
         }.items(),
     )
