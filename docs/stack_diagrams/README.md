@@ -1,64 +1,52 @@
-# Bluebot ROS Stack Diagrams
+# Bluebot Stack Diagrams
 
-This folder contains Mermaid source for your two startup modes:
+Mermaid source diagrams for the current `robot_bringup` stack.
 
-- [start_map_stack.mmd](start_map_stack.mmd)
-- [start_nav_stack.mmd](start_nav_stack.mmd)
+## Diagram Files
 
-## Render in Markdown (GitHub/GitLab)
+- `master_stack_diagram.mmd`
+  - High-level view of `bluebot_bringup.sh` mapping + navigation modes.
+- `start_map_stack.mmd`
+  - Detailed flow for `bluebot_bringup.sh start mapping`.
+- `start_nav_stack.mmd`
+  - Detailed flow for `bluebot_bringup.sh start navigation <map>`.
 
-Open the `.mmd` content directly in a markdown file using a Mermaid-enabled renderer.
+## Render in Markdown
 
-Example in Markdown:
+Use Mermaid fenced blocks in Markdown-enabled renderers (GitHub/GitLab/VS Code plugins):
 
-```md
+````md
 ```mermaid
 flowchart TD
   ...
 ```
-```
+````
 
-> Note: many renderers require the block to be fenced with `````mermaid`.
-
-## Render in VS Code
-
-1. Install **Mermaid Preview** or **Markdown Preview Enhanced**.
-2. Open the `.mmd` file.
-3. Use the extension preview to view the diagram live.
-
-## Export to image/PDF with Mermaid CLI
+## Render with Mermaid CLI
 
 ```bash
-# install once (if not already)
+export ROS_WS=/path/to/your/ros2_ws
 npm install -g @mermaid-js/mermaid-cli
 
-# render start-map
-mmdc -i /ssd/ros2_ws/docs/stack_diagrams/start_map_stack.mmd \
-     -o /ssd/ros2_ws/docs/stack_diagrams/start_map_stack.svg
-
-# render start-nav
-mmdc -i /ssd/ros2_ws/docs/stack_diagrams/start_nav_stack.mmd \
-     -o /ssd/ros2_ws/docs/stack_diagrams/start_nav_stack.svg
+mmdc -i "$ROS_WS/docs/stack_diagrams/master_stack_diagram.mmd" -o "$ROS_WS/docs/stack_diagrams/master_stack_diagram.svg"
+mmdc -i "$ROS_WS/docs/stack_diagrams/start_map_stack.mmd" -o "$ROS_WS/docs/stack_diagrams/start_map_stack.svg"
+mmdc -i "$ROS_WS/docs/stack_diagrams/start_nav_stack.mmd" -o "$ROS_WS/docs/stack_diagrams/start_nav_stack.svg"
 ```
 
-## Fast local render from a markdown file
+## Quick Local Check
 
 ```bash
-cd /ssd/ros2_ws/docs/stack_diagrams
+export ROS_WS=/path/to/your/ros2_ws
+cd "$ROS_WS/docs/stack_diagrams"
 python3 - <<'PY'
 from pathlib import Path
 
-for name in ["start_map_stack.mmd", "start_nav_stack.mmd"]:
+for name in [
+    "master_stack_diagram.mmd",
+    "start_map_stack.mmd",
+    "start_nav_stack.mmd",
+]:
     print(f"\n--- {name} ---")
     print(Path(name).read_text())
 PY
 ```
-
-## Where to keep these for docs
-
-If you generate site docs, include them as:
-
-- `docs/stack_diagrams/start_map_stack.mmd`
-- `docs/stack_diagrams/start_nav_stack.mmd`
-
-and render them in your preferred Mermaid/Doc pipeline.

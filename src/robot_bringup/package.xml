@@ -37,7 +37,7 @@
   <exec_depend>ros2_serial_diff_drive_bridge</exec_depend>
   <exec_depend>serial_diff_drive_hw</exec_depend>
   <exec_depend>udp_cmd_vel_bridge</exec_depend>
-  <exec_depend>bluebot_v3</exec_depend>
+  <exec_depend>isaac_nav2_pose_bridge</exec_depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

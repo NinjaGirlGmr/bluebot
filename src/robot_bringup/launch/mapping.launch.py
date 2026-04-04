@@ -28,6 +28,11 @@ def generate_launch_description() -> LaunchDescription:
     serial_cmd_vel_topic = LaunchConfiguration('serial_cmd_vel_topic')
     serial_odom_topic = LaunchConfiguration('serial_odom_topic')
     serial_publish_tf = LaunchConfiguration('serial_publish_tf')
+    serial_enable_stall_compensation = LaunchConfiguration('serial_enable_stall_compensation')
+    serial_min_effective_linear_mps = LaunchConfiguration('serial_min_effective_linear_mps')
+    serial_min_effective_angular_rad_s = LaunchConfiguration('serial_min_effective_angular_rad_s')
+    serial_min_effective_turn_wheel_mps = LaunchConfiguration('serial_min_effective_turn_wheel_mps')
+    serial_zero_cmd_epsilon = LaunchConfiguration('serial_zero_cmd_epsilon')
 
     state_estimation_imu_orientation_topic = LaunchConfiguration(
         'state_estimation_imu_orientation_topic'
@@ -109,6 +114,7 @@ def generate_launch_description() -> LaunchDescription:
             apriltag_map_recorder_params_file,
             {
                 'use_sim_time': ParameterValue(use_sim_time, value_type=bool),
+                'odom_topic': state_estimation_fused_odom_topic,
                 'output_yaml': apriltag_map_output_yaml,
             },
         ],
@@ -132,6 +138,11 @@ def generate_launch_description() -> LaunchDescription:
             'cmd_vel_topic': serial_cmd_vel_topic,
             'odom_topic': serial_odom_topic,
             'publish_tf': serial_publish_tf,
+            'enable_stall_compensation': serial_enable_stall_compensation,
+            'min_effective_linear_mps': serial_min_effective_linear_mps,
+            'min_effective_angular_rad_s': serial_min_effective_angular_rad_s,
+            'min_effective_turn_wheel_mps': serial_min_effective_turn_wheel_mps,
+            'zero_cmd_epsilon': serial_zero_cmd_epsilon,
         }.items(),
     )
 
@@ -177,7 +188,7 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     straight_line_compensator = Node(
-        package='bluebot_v3',
+        package='robot_bringup',
         executable='straight_line_compensator_node',
         name='straight_line_compensator',
         output='screen',
@@ -277,6 +288,11 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument('serial_cmd_vel_topic', default_value='/cmd_vel_compensated'),
         DeclareLaunchArgument('serial_odom_topic', default_value='/odom_raw'),
         DeclareLaunchArgument('serial_publish_tf', default_value='false'),
+        DeclareLaunchArgument('serial_enable_stall_compensation', default_value='true'),
+        DeclareLaunchArgument('serial_min_effective_linear_mps', default_value='0.14'),
+        DeclareLaunchArgument('serial_min_effective_angular_rad_s', default_value='0.25'),
+        DeclareLaunchArgument('serial_min_effective_turn_wheel_mps', default_value='0.10'),
+        DeclareLaunchArgument('serial_zero_cmd_epsilon', default_value='0.0001'),
         DeclareLaunchArgument(
             'state_estimation_params_file',
             default_value=PathJoinSubstitution(

@@ -32,6 +32,18 @@ setup(
             'health_monitor = robot_bringup.health_monitor_node:main',
             'apriltag_nav_behavior_tree = robot_bringup.apriltag_nav_behavior_tree_node:main',
             'apriltag_map_recorder = robot_bringup.apriltag_map_recorder_node:main',
+            (
+                'straight_line_compensator_node = '
+                'robot_bringup.straight_line_compensator_node:main'
+            ),
+            (
+                'apriltag_landmark_tf_publisher = '
+                'robot_bringup.apriltag_landmark_tf_publisher_node:main'
+            ),
+            (
+                'apriltag_map_localization = '
+                'robot_bringup.apriltag_map_localization_node:main'
+            ),
         ],
     },
 )

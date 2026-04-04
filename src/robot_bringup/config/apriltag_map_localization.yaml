@@ -1,0 +1,20 @@
+apriltag_map_localization:
+  ros__parameters:
+    use_sim_time: false
+    detections_topic: /tag_detections
+    output_pose_topic: /apriltag/map_pose
+    map_frame: map
+    base_frame: base_link
+    landmarks_file: ""
+    map_yaml: ""
+    auto_landmarks_from_map: true
+    use_landmark_yaw: true
+    min_detection_range_m: 0.05
+    max_detection_range_m: 4.5
+    base_position_stddev_m: 0.05
+    base_yaw_stddev_rad: 0.15
+    position_stddev_per_meter: 0.03
+    yaw_stddev_per_meter: 0.07
+    tf_lookup_timeout_sec: 0.08
+    use_latest_tf_on_failure: true
+    debug_log_matches: false

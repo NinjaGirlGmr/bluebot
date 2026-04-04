@@ -2,10 +2,24 @@ apriltag_map_recorder:
   ros__parameters:
     use_sim_time: false
     detections_topic: /tag_detections
+    odom_topic: /odom
     map_frame: map
     output_yaml: /tmp/apriltag_map_landmarks.yaml
     write_period_sec: 5.0
-    min_observations: 3
+    min_observations: 5
+    min_consecutive_detections: 12
+    max_consecutive_gap_sec: 0.30
+    min_sample_interval_sec: 0.10
+    require_stationary: true
+    max_robot_linear_speed_mps: 0.03
+    max_robot_angular_speed_rad_s: 0.10
+    min_detection_range_m: 0.10
+    max_detection_range_m: 2.50
+    use_covariance_filter: true
+    allow_zero_covariance: true
+    max_detection_position_stddev_m: 0.20
+    max_detection_yaw_stddev_rad: 0.35
     use_latest_tf_on_failure: true
     write_on_shutdown: true
     log_new_tags: true
+    log_rejections: false

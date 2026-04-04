@@ -1,66 +1,68 @@
 flowchart TD
-%% ----------------- STYLE DEFINITIONS -----------------
+%% ---------- STYLE DEFINITIONS ----------
 classDef startup fill:#cce5ff,stroke:#3399ff,stroke-width:1px,color:#000;
+classDef launch fill:#e8f4ff,stroke:#3399ff,stroke-width:1px,color:#000;
+classDef sensors fill:#d4edda,stroke:#28a745,stroke-width:1px,color:#000;
 classDef hardware fill:#d1ecf1,stroke:#17a2b8,stroke-width:1px,color:#000;
-classDef sensors fill:#cce5ff,stroke:#3399ff,stroke-width:1px,color:#000;
-classDef vslam fill:#dcd3f7,stroke:#6f42c1,stroke-width:1px,color:#000;
-classDef teleop fill:#fff3cd,stroke:#ffc107,stroke-width:1px,color:#000;
 classDef state fill:#f0f0f0,stroke:#6c757d,stroke-width:1px,color:#000;
 classDef mapping fill:#f8d7da,stroke:#dc3545,stroke-width:1px,color:#000;
-classDef safety fill:#fff3cd,stroke:#ffc107,stroke-width:1px,color:#000;
+classDef apriltag fill:#fff3cd,stroke:#ff9800,stroke-width:1px,color:#000;
+classDef ops fill:#efe8ff,stroke:#6f42c1,stroke-width:1px,color:#000;
 
-%% ----------------- STARTUP -----------------
-A["bluebot start-map"]:::startup
-B["start_stack()"]:::startup
+%% ---------- ENTRYPOINT ----------
+A["bluebot_bringup.sh start mapping"]:::startup
+B["robot_bringup/mapping.launch.py"]:::launch
 
-%% ----------------- HARDWARE -----------------
-C["ros2_serial_diff_drive_bridge\nodom_topic=/odom_raw, publish_tf=false"]:::hardware
-D["serial_diff_drive_hw bringup\ncontroller_manager + controllers"]:::hardware
-E["robot_state_publisher"]:::hardware
+%% ---------- SENSORS ----------
+subgraph SENS["sensors.launch.py"]
+S1["rplidar_node\n/scan"]:::sensors
+S2["a471_serial_node + imu_node\n/imu/data_raw, /imu/orientation"]:::sensors
+S3["sensor static TF publishers\n(base->lidar, base->imu)"]:::sensors
+end
 
-%% ----------------- SENSORS -----------------
-F["Lidar + static TF\n/frame_id=laser, /scan"]:::sensors
-G["IMU node\n/imu/data_raw, /imu/orientation"]:::sensors
-H["RealSense camera"]:::sensors
+%% ---------- DRIVE + STATE ----------
+subgraph DRIVE["Drive stack + state estimation"]
+D1["ros2_serial_diff_drive_bridge\n/odom_raw + /cmd_vel_compensated"]:::hardware
+D2["serial_diff_drive_hw\ncontroller_manager + controllers"]:::hardware
+D3["robot_localization_filter (local EKF)\n/odom_raw + imu -> /odom"]:::state
+D4["straight_line_compensator\n/cmd_vel -> /cmd_vel_compensated"]:::state
+D5["udp_cmd_vel_bridge (optional)\nUDP -> /cmd_vel"]:::state
+end
 
-%% ----------------- VSLAM -----------------
-I["Isaac ROS Visual SLAM\n(direct or NITROS)"]:::vslam
+%% ---------- MAPPING ----------
+M1["slam_toolbox (async_slam_toolbox_node)\nodom remap: /odom"]:::mapping
+M2["Published map state\n/map + map->odom TF"]:::mapping
 
-%% ----------------- TELEOP & BRIDGE -----------------
-J["teleop_twist_joy\n/joy -> /cmd_vel"]:::teleop
-K["Foxglove Bridge"]:::teleop
+%% ---------- APRILTAG (OPTIONAL DURING MAPPING) ----------
+AT1["apriltag_realsense.launch.py (optional)\nRealSense + Rectify + AprilTag + base->camera TF"]:::apriltag
+AT2["apriltag_map_recorder (optional)\n/tag_detections + TF + /odom -> landmarks yaml"]:::apriltag
 
-%% ----------------- STATE ESTIMATION -----------------
-L["State Estimation\nrobot_localization EKF"]:::state
-N["Fused odom for Nav2 inputs\n/odometry/filtered -> /odom"]:::state
+%% ---------- OPS ----------
+H1["health_monitor (mapping profile)"]:::ops
+SAV["bluebot_bringup.sh save-map\nmap_saver_cli + copy {map}.apriltags.yaml"]:::ops
 
-%% ----------------- MAPPING -----------------
-M["mapping_job.launch.py\n(slam:=False)"]:::mapping
-O["slam_toolbox (mapping mode)"]:::mapping
-P["drop_detector_node"]:::mapping
-Q["cmd_vel_safety_gate\n(/cmd_vel_safe -> /cmd_vel)"]:::safety
+%% ---------- FLOW ----------
+A --> B
 
-%% ----------------- DATA FLOW -----------------
+B -->|includes| SENS
+B -->|starts| D1
+B -->|starts| D2
+B -->|starts| D3
+B -->|starts| D4
+B -->|optional| D5
+B -->|starts| M1
+B -->|optional| AT1
+B -->|optional| AT2
+B -->|optional| H1
 
-%% Startup flow
-A -->|start stack| B
+S1 --> M1
+S2 --> D3
+D1 -->|/odom_raw| D3
+D4 -->|/cmd_vel_compensated| D1
+D5 -->|/cmd_vel| D4
+D3 -->|/odom| M1
 
-%% Hardware & sensors
-B -->|start serial bridge| C
-B -->|bringup diff drive hw| D
-B -->|start RSP| E
-B -->|start lidar| F
-B -->|start IMU| G
-B -->|start camera| H
-B -->|start VSLAM| I
-B -->|start teleop| J
-B -->|start foxglove bridge| K
-B -->|start EKF| L
-L -->|fused odometry| N
-
-%% Mapping flow
-B -->|start mapping job| M
-M -->|SLAM data| O
-M -->|drop detection| P
-M -->|safe command control| Q
-Q -->|cmd_vel_safe -> bridge| C
+AT1 -->|/tag_detections| AT2
+M1 --> M2
+M2 --> SAV
+AT2 --> SAV

@@ -42,6 +42,7 @@ health_monitor:
       - controller_manager
       - robot_state_publisher
       - robot_localization_filter
+      - robot_localization_global_filter
       - straight_line_compensator
       - udp_cmd_vel_bridge
       - map_server

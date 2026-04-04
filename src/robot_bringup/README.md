@@ -18,12 +18,14 @@ This package provides launch/config for:
   - `health_monitor`
   - `apriltag_nav_behavior_tree`
   - `apriltag_map_recorder`
+  - `apriltag_landmark_tf_publisher`
+  - `apriltag_map_localization`
 
 ## Directory Layout
 
 - `launch/`: entrypoints (`sensors`, `mapping`, `nav2`, `navigation`, `apriltag_realsense`, `localization`, `health`, `observability`)
 - `config/`: dedicated YAML config per stack/component
-- `robot_bringup/`: Python nodes (`health_monitor`, `apriltag_nav_behavior_tree`, `apriltag_map_recorder`)
+- `robot_bringup/`: Python nodes (`health_monitor`, `apriltag_nav_behavior_tree`, `apriltag_map_recorder`, `apriltag_landmark_tf_publisher`, `apriltag_map_localization`)
 
 ## Build
 
@@ -41,8 +43,8 @@ source /ssd/ros2_ws/install/setup.bash
 | `sensors.launch.py` | LiDAR, IMU serial bridge, IMU bridge, sensor static TFs, health monitor |
 | `apriltag_realsense.launch.py` | Realsense + Isaac rectification + AprilTag detection + health monitor |
 | `mapping.launch.py` | Sensors + drive stack + EKF (drift-tuned) + straight-line compensator + SLAM + UDP teleop + optional AprilTag recorder + health monitor |
-| `nav2.launch.py` | Nav2 + drive stack + EKF (drift-tuned) + straight-line compensator + UDP teleop + health monitor |
-| `navigation.launch.py` | Top-level nav mode: sensors + `nav2.launch.py` + optional AprilTag camera + AprilTag behavior tree |
+| `nav2.launch.py` | Nav2 + dedicated smoother params + drive stack + local/global EKF + straight-line compensator + UDP teleop + health monitor |
+| `navigation.launch.py` | Top-level nav mode: sensors + `nav2.launch.py` + optional AprilTag camera + landmark TF publisher + AprilTag map-localization pose publisher + AprilTag behavior tree |
 | `localization.launch.py` | Standalone `slam_toolbox` localization + health monitor |
 | `health.launch.py` | Standalone health monitor |
 | `observability.launch.py` | Foxglove bridge + optional health monitor |
@@ -87,7 +89,7 @@ Available modes:
 
 ## Foxglove Templates
 
-New tabbed Foxglove layouts for `robot_bringup`:
+Foxglove layouts for `robot_bringup`:
 
 - Mapping template:
   - `/ssd/ros2_ws/foxglove/robot_bringup_mapping_layout.json`
@@ -95,12 +97,13 @@ New tabbed Foxglove layouts for `robot_bringup`:
     - `Mapping + AprilTag` (map creation, scan, odom, AprilTag detections, pose updates)
     - `Health + Logs` (diagnostics summary/detail, drive metrics, `/rosout`)
 
-- Navigation template:
+- Navigation template (single-pane):
   - `/ssd/ros2_ws/foxglove/robot_bringup_navigation_layout.json`
-  - Tabs:
-    - `Navigation + Landmarks` (map/plans, AMCL, AprilTag detections and landmark topic if published)
-    - `Behavior Tree` (behavior-focused logs, Nav2 action status, motion response metrics)
-    - `Health + Logs` (diagnostics summary/detail, drive metrics, `/rosout`)
+  - One 3D pane with:
+    - `/map`, `/scan`, `/odom`, `/odom_raw`, `/tag_detections`
+    - pose publish tools:
+      - goal pose: `/goal_pose`
+      - initial pose: `/initialpose`
 
 ## Common Workflows
 
@@ -117,7 +120,17 @@ ros2 launch robot_bringup mapping.launch.py \
 AprilTag recorder requirements:
 - `apriltag_map_recorder_enabled:=true`
 - a valid TF chain from `map` to camera optical frame (for example `camera_color_optical_frame`)
-- sufficient observations (`min_observations` in `config/apriltag_map_recorder.yaml`, default `3`)
+- sufficient observations (`min_observations` in `config/apriltag_map_recorder.yaml`, default `5`)
+
+Recommended mapping capture pattern (best landmark quality):
+- stop-and-scan at each tag (robot stationary before sampling)
+- keep tags inside configured range gates (`0.10m` to `2.50m` defaults)
+- capture multiple angles per tag
+- let the recorder filters work:
+  - `min_consecutive_detections` (default `12`)
+  - stationary gate from odom (`require_stationary: true`)
+  - covariance gate (`use_covariance_filter: true`)
+  - sample spacing (`min_sample_interval_sec: 0.10`)
 
 `apriltag_realsense.launch.py` now publishes a static TF from `base_link` to `camera_link` by default:
 - `publish_base_to_camera_tf:=true`
@@ -148,6 +161,39 @@ source /ssd/ros2_ws/install/setup.bash
 ros2 launch robot_bringup navigation.launch.py map:=/ssd/maps/office_a.yaml
 ```
 
+Recommended AprilTag-enabled navigation run:
+
+```bash
+source /ssd/ros2_ws/install/setup.bash
+ros2 launch robot_bringup navigation.launch.py \
+  map:=/ssd/maps/office_a.yaml \
+  apriltag_realsense_enabled:=true
+```
+
+Runtime frame/estimation pipeline in nav mode:
+- static landmark anchors are loaded from `<map>.apriltags.yaml` (or `apriltag_landmarks_file`) and published as `map -> apriltag_landmark/*`
+- detector provides `camera -> tag_i`
+- `apriltag_map_localization` computes robot pose in `map` and publishes `/apriltag/map_pose`
+- `robot_localization_global_filter` fuses:
+  - `odom0`: local fused odom (`/odom`)
+  - `pose0`: AprilTag global pose (`/apriltag/map_pose`)
+  - `pose1`: fallback/global initial pose (`/initialpose`)
+- global EKF publishes `map -> odom`; Nav2 consumes TF automatically
+
+Important defaults for this pipeline:
+- `state_estimation_global_enabled:=true`
+- `apriltag_landmark_tf_enabled:=true`
+- `apriltag_map_localization_enabled:=true`
+- AMCL `tf_broadcast: false` in `config/nav2.yaml` (single owner for `map -> odom`)
+
+Quick validation checks:
+
+```bash
+ros2 topic echo /apriltag/map_pose --once
+ros2 run tf2_ros tf2_echo map odom
+ros2 node list | rg "apriltag_landmark_tf_publisher|apriltag_map_localization|robot_localization_global_filter|smoother_server"
+```
+
 Enable AprilTag camera pipeline in nav mode:
 
 ```bash
@@ -155,6 +201,25 @@ ros2 launch robot_bringup navigation.launch.py \
   map:=/ssd/maps/office_a.yaml \
   apriltag_realsense_enabled:=true
 ```
+
+Isaac occupancy-grid localization (auto initial pose to Nav2) is enabled by default in nav mode:
+
+```bash
+ros2 launch robot_bringup navigation.launch.py \
+  map:=/ssd/maps/office_a.yaml \
+  grid_localization_enabled:=true
+```
+
+Key args:
+- `grid_localization_enabled` (default `true`)
+- `grid_localization_output_topic` (default `/initialpose`)
+- `grid_localization_fallback_enabled` (default `true`)
+- `grid_localization_fallback_wait_sec` (default `6.0`)
+- `occupancy_grid_localizer_enabled` (default `true`)
+
+Grid-localizer map image note:
+- `isaac_ros_occupancy_grid_localizer` supports `.png/.jpg/.jpeg` map images.
+- If your Nav2 map YAML references `.pgm`, `isaac_grid_localization_to_nav2.launch.py` now auto-creates a localizer copy in `/tmp/isaac_grid_localizer_maps/` with a converted `.png` image.
 
 Disable behavior tree temporarily:
 
@@ -164,11 +229,60 @@ ros2 launch robot_bringup navigation.launch.py \
   apriltag_behavior_enabled:=false
 ```
 
+## Navigation Troubleshooting
+
+### Map missing in Foxglove (`/map` not visible)
+
+Check:
+- `map_server` reached Active lifecycle state.
+- `lifecycle_manager_localization` reports managed nodes active.
+
+Useful command:
+
+```bash
+ros2 topic echo /map --once
+```
+
+If no map message appears:
+- verify `map:=/absolute/path/to/map.yaml` is passed to `navigation.launch.py`
+- verify Nav2 params are loaded from `config/nav2.yaml` (not overridden by unrelated params)
+
+### No initial pose seen (`/initialpose`)
+
+Expected behavior in this stack:
+- `isaac_to_nav2_pose` publishes `/initialpose` from:
+  - occupancy-grid localizer output (`/localization_result`) when available, or
+  - fallback initial pose after `grid_localization_fallback_wait_sec` (default `6.0`)
+
+Checks:
+
+```bash
+ros2 topic echo /initialpose --once
+ros2 topic echo /localization_result --once
+```
+
+Notes:
+- `apriltag_nav_behavior_tree` may log QoS incompatibility warnings on `/initialpose`; this does not block AMCL initialization.
+- Occupancy localizer only emits on trigger. Trigger one global-search pass with:
+
+```bash
+ros2 service call /trigger_grid_search_localization std_srvs/srv/Empty {}
+```
+
+- If occupancy localizer is unstable, run with fallback only:
+
+```bash
+ros2 launch robot_bringup navigation.launch.py \
+  map:=/ssd/maps/office_a.yaml \
+  occupancy_grid_localizer_enabled:=false
+```
+
 ## Drift Management
 
 `robot_bringup` now includes two drift-management layers used by `mapping`, `nav2`, and `navigation`:
 - Odom drift mitigation in EKF: wheel odom + IMU yaw-rate focused fusion
 - Yaw drift mitigation while driving straight: `straight_line_compensator`
+- Low-command stall compensation in serial bridge (helps prevent turn buzz/stall)
 
 Drive command path:
 - `/cmd_vel` -> `straight_line_compensator` -> `/cmd_vel_compensated` -> `serial_diff_drive_bridge`
@@ -176,6 +290,8 @@ Drive command path:
 Main tuning files:
 - `config/state_estimation_drift.yaml`
 - `config/straight_line_compensator.yaml`
+- `config/nav2_serial_diff_drive_bridge.yaml`
+- `config/mapping_serial_diff_drive_bridge.yaml`
 
 Current straight-line defaults are tuned for startup stability and right-pull correction:
 - `angular_deadband: 0.08`
@@ -185,6 +301,12 @@ Current straight-line defaults are tuned for startup stability and right-pull co
 - `max_angular_correction: 0.65`
 - `startup_holdoff_sec: 1.5`
 - `min_odom_samples_before_comp: 10`
+
+Current serial bridge stall-comp defaults:
+- `enable_stall_compensation: true`
+- `min_effective_linear_mps: 0.14`
+- `min_effective_angular_rad_s: 0.25`
+- `min_effective_turn_wheel_mps: 0.10` (enforces turning wheel breakaway speed floor)
 
 ## AprilTag Behavior Tree
 
@@ -282,9 +404,11 @@ Health profile configs:
   - `config/mapping_health_monitor.yaml`
 - Navigation:
   - `config/nav2.yaml`
+  - `config/nav2_smoother.yaml`
   - `config/nav2_serial_diff_drive_bridge.yaml`
   - `config/nav2_udp_cmd_vel_bridge.yaml`
   - `config/state_estimation_drift.yaml`
+  - `config/state_estimation_map_fusion.yaml`
   - `config/straight_line_compensator.yaml`
   - `config/nav2_health_monitor.yaml`
   - `config/navigation_health_monitor.yaml`
@@ -294,6 +418,8 @@ Health profile configs:
   - `config/apriltag_nav_behavior.yaml`
   - `config/apriltag_nav_rules.yaml`
   - `config/apriltag_map_recorder.yaml`
+  - `config/apriltag_landmark_tf.yaml`
+  - `config/apriltag_map_localization.yaml`
   - `config/docking_server.yaml`
   - `config/apriltag_health_monitor.yaml`
 - Observability:
@@ -316,6 +442,14 @@ Health profile configs:
 - If `/odom` is empty but nodes exist:
   - verify `/clock` publisher status
   - verify `/odom_raw` and `/odom` rates: `ros2 topic hz /odom_raw` and `ros2 topic hz /odom`
+- If you are not seeing `/initialpose` in navigation:
+  - confirm `grid_localization_enabled:=true`
+  - check nodes: `ros2 node list | rg "occupancy_grid_localizer|isaac_to_nav2_pose"`
+  - check topic once: `ros2 topic echo /initialpose --once`
+  - trigger occupancy-grid localization once: `ros2 service call /trigger_grid_search_localization std_srvs/srv/Empty {}`
+  - verify map path is valid and passed to launch with `map:=/ssd/maps/<map>.yaml`
+  - `isaac_nav2_pose_bridge` now auto-converts `.pgm` map images to a temporary png-backed yaml under `/tmp/isaac_grid_localizer_maps/` for `isaac_ros_occupancy_grid_localizer`
+  - to force fallback-only initial pose (skip occupancy localizer), run with `occupancy_grid_localizer_enabled:=false`
 - If AprilTag map save writes `tags: []`:
   - ensure mapping ran with `apriltag_realsense_enabled:=true` and `apriltag_map_recorder_enabled:=true`
   - check recorder logs for TF errors like `Failed transform camera_color_optical_frame->map`

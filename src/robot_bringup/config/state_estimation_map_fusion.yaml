@@ -1,0 +1,57 @@
+robot_localization_global_filter:
+  ros__parameters:
+    use_sim_time: false
+    frequency: 20.0
+    sensor_timeout: 0.4
+    two_d_mode: true
+    debug: false
+    publish_tf: true
+    print_diagnostics: false
+    use_control: false
+    reset_on_time_jump: true
+    transform_time_offset: 0.0
+    transform_timeout: 0.1
+
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_link
+    world_frame: map
+
+    # Local odometry prior.
+    odom0: /odom
+    odom0_queue_size: 20
+    odom0_differential: false
+    odom0_relative: false
+    odom0_config: [
+      true, true, false,
+      false, false, true,
+      true, false, false,
+      false, false, true,
+      false, false, false
+    ]
+
+    # AprilTag absolute pose in the map frame.
+    pose0: /apriltag/map_pose
+    pose0_queue_size: 10
+    pose0_differential: false
+    pose0_relative: false
+    pose0_config: [
+      true, true, false,
+      false, false, true,
+      false, false, false,
+      false, false, false,
+      false, false, false
+    ]
+
+    # Optional global pose fallback (for example /initialpose from grid localizer/RViz).
+    pose1: /initialpose
+    pose1_queue_size: 10
+    pose1_differential: false
+    pose1_relative: false
+    pose1_config: [
+      true, true, false,
+      false, false, true,
+      false, false, false,
+      false, false, false,
+      false, false, false
+    ]

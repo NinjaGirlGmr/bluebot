@@ -4,6 +4,7 @@ from typing import List
 import rclpy
 from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
 from rclpy.node import Node
+from rclpy.qos import QoSDurabilityPolicy, QoSProfile, QoSReliabilityPolicy
 
 DEFAULT_COVARIANCE = [
     0.25, 0.0, 0.0, 0.0, 0.0, 0.0,
@@ -68,8 +69,11 @@ class IsaacToNav2Pose(Node):
         self._fallback_publish_timer = None
         self._fallback_remaining_publishes = 0
 
+        initialpose_qos = QoSProfile(depth=10)
+        initialpose_qos.reliability = QoSReliabilityPolicy.RELIABLE
+        initialpose_qos.durability = QoSDurabilityPolicy.TRANSIENT_LOCAL
         self.pub = self.create_publisher(
-            PoseWithCovarianceStamped, output_topic, 10)
+            PoseWithCovarianceStamped, output_topic, initialpose_qos)
 
         if self.enable_pose_stamped_input:
             self.create_subscription(

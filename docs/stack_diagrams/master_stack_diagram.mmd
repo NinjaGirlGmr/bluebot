@@ -1,143 +1,81 @@
-flowchart TD
-%% ----------------- STYLE DEFINITIONS -----------------
-classDef sensors fill:#cce5ff,stroke:#3399ff,stroke-width:1px,color:#000;
-classDef perception fill:#d4edda,stroke:#28a745,stroke-width:1px,color:#000;
-classDef safety fill:#fff3cd,stroke:#ffc107,stroke-width:1px,color:#000;
-classDef nav2 fill:#e2d9f3,stroke:#6f42c1,stroke-width:1px,color:#000;
-classDef mapping fill:#f8d7da,stroke:#dc3545,stroke-width:1px,color:#000;
-classDef hardware fill:#d1ecf1,stroke:#17a2b8,stroke-width:1px,color:#000;
-classDef tf fill:#f0f0f0,stroke:#6c757d,stroke-width:1px,color:#000;
-classDef vslam fill:#dcd3f7,stroke:#6f42c1,stroke-width:1px,color:#000;
-classDef teleop fill:#fff3cd,stroke:#ffc107,stroke-width:1px,color:#000;
+flowchart LR
+%% ---------- STYLE DEFINITIONS ----------
 classDef startup fill:#cce5ff,stroke:#3399ff,stroke-width:1px,color:#000;
-classDef fileops fill:#cce5ff,stroke:#3399ff,stroke-width:1px,color:#000;
+classDef launch fill:#e8f4ff,stroke:#3399ff,stroke-width:1px,color:#000;
+classDef sensors fill:#d4edda,stroke:#28a745,stroke-width:1px,color:#000;
+classDef hardware fill:#d1ecf1,stroke:#17a2b8,stroke-width:1px,color:#000;
+classDef state fill:#f0f0f0,stroke:#6c757d,stroke-width:1px,color:#000;
+classDef mapping fill:#f8d7da,stroke:#dc3545,stroke-width:1px,color:#000;
+classDef nav2 fill:#fce8e6,stroke:#dc3545,stroke-width:1px,color:#000;
+classDef apriltag fill:#fff3cd,stroke:#ff9800,stroke-width:1px,color:#000;
+classDef artifacts fill:#efe8ff,stroke:#6f42c1,stroke-width:1px,color:#000;
 
-%% ----------------- STARTUP -----------------
-StartNav["bluebot start-nav <map_yaml>"]:::startup
-StartMap["bluebot start-map"]:::startup
-Stack["start_stack()"]:::startup
+ENTRY["bluebot_bringup.sh"]:::startup
+MODE_MAP["mode: mapping"]:::startup
+MODE_NAV["mode: navigation {map}"]:::startup
 
-%% ----------------- SENSORS -----------------
-Depth["Depth Camera\n(aligned_depth_to_color/image_raw)"]:::sensors
-VslamOdom["VSLAM Odometry\n(/visual_slam/tracking/odometry)"]:::sensors
-Scan["Lidar Scan\n(/scan)"]:::sensors
-IMU["IMU\n(/imu/data)"]:::sensors
-RealSense["RealSense Camera"]:::sensors
+ENTRY --> MODE_MAP
+ENTRY --> MODE_NAV
 
-%% ----------------- PERCEPTION -----------------
-DropDetector["Drop Detector Node"]:::perception
-DropTopic["/drop_detected"]:::perception
+%% ---------- SHARED BUILDING BLOCKS ----------
+SENS["sensors.launch.py\n(rplidar + imu + static TFs)"]:::sensors
+DRIVE["Drive stack\nserial bridge + serial_diff_drive_hw"]:::hardware
+LOCAL_EKF["robot_localization_filter\n/odom_raw + imu -> /odom"]:::state
+STRAIGHT["straight_line_compensator\n/cmd_vel -> /cmd_vel_compensated"]:::state
 
-%% ----------------- SAFETY & MOTION -----------------
-CmdIn["/cmd_vel"]:::safety
-Gate["Cmd_vel Safety Gate"]:::safety
-CmdSafe["/cmd_vel_safe"]:::safety
-SerialBridge["ros2_serial_diff_drive_bridge"]:::hardware
-Motors["Motor Controller"]:::hardware
+MODE_MAP --> SENS
+MODE_MAP --> DRIVE
+MODE_MAP --> LOCAL_EKF
+MODE_MAP --> STRAIGHT
 
-%% ----------------- VSLAM -----------------
-VSLAM["Isaac ROS Visual SLAM\n(direct or NITROS)"]:::vslam
+MODE_NAV --> SENS
+MODE_NAV --> DRIVE
+MODE_NAV --> LOCAL_EKF
+MODE_NAV --> STRAIGHT
 
-%% ----------------- NAV2 -----------------
-Nav2Stack["nav2_bringup\n(planner + controller + BT + costmaps)"]:::nav2
-AMCL["AMCL\nodom_topic=/odom"]:::nav2
-Planner["Planner"]:::nav2
-Controller["Controller"]:::nav2
-BT["Behavior Tree"]:::nav2
-LocalCM["Local Costmap + Nvblox layer"]:::mapping
-MapTopic["/map"]:::mapping
-TFmap["/tf map->odom"]:::tf
-InitialPose["/initialpose"]:::tf
+%% ---------- MAPPING BRANCH ----------
+MAP_LAUNCH["robot_bringup/mapping.launch.py"]:::launch
+SLAM["slam_toolbox mapping\n/map + map->odom TF"]:::mapping
+MAP_REC["apriltag_map_recorder (optional)\n/tag_detections + TF + /odom"]:::apriltag
+SAVE["save-map\nmap_saver_cli + landmarks copy"]:::artifacts
+ART_MAP["{map}.yaml"]:::artifacts
+ART_TAGS["{map}.apriltags.yaml"]:::artifacts
 
-%% ----------------- STATE -----------------
-EKF["State Estimation\n(robot_localization EKF)"]:::hardware
-FusedOdom["Fused odometry\n(/odometry/filtered -> /odom)"]:::hardware
-RSP["robot_state_publisher"]:::hardware
+MODE_MAP --> MAP_LAUNCH
+MAP_LAUNCH --> SLAM
+MAP_LAUNCH --> MAP_REC
+SLAM --> SAVE --> ART_MAP
+MAP_REC --> SAVE --> ART_TAGS
 
-%% ----------------- TELEOP & BRIDGE -----------------
-Teleop["teleop_twist_joy\n(/joy -> /cmd_vel)"]:::teleop
-Foxglove["Foxglove Bridge :8765"]:::teleop
-Waypoints["/foxglove/waypoints"]:::teleop
-WPBridge["foxglove_waypoint_bridge"]:::teleop
-NavThroughPoses["/navigate_through_poses action"]:::teleop
-Status["/foxglove/waypoints/status"]:::teleop
+%% ---------- NAVIGATION BRANCH ----------
+NAV_LAUNCH["robot_bringup/navigation.launch.py"]:::launch
+NAV2_LAUNCH["included nav2.launch.py"]:::launch
+NAV2_STACK["nav2_bringup + smoother_server\n(map_server, amcl, planner, controller, BT)"]:::nav2
+GLOBAL_EKF["robot_localization_global_filter\n/odom + /apriltag/map_pose + /initialpose\n-> map->odom TF"]:::state
+GRID_LOC["isaac_grid_localization_to_nav2\n-> /initialpose"]:::apriltag
+AT_TF["apriltag_landmark_tf_publisher\nloads {map}.apriltags.yaml"]:::apriltag
+AT_LOC["apriltag_map_localization\n/tag_detections -> /apriltag/map_pose"]:::apriltag
+AT_CAM["apriltag_realsense.launch.py (optional)"]:::apriltag
+AT_BT["apriltag_nav_behavior_tree"]:::apriltag
 
-%% ----------------- MAPPING -----------------
-SLAMTB["SLAM Toolbox / slam_toolbox"]:::mapping
-Nvblox["Nvblox Node"]:::mapping
-MappingJob["mapping_job.launch.py\n(slam:=False)"]:::mapping
-MapFiles["/ssd/maps/<name>.yaml + .pgm"]:::fileops
-WaypointsYAML["/ssd/maps/waypoints.yaml"]:::fileops
-CaptureWP["bluebot.sh capture-waypoint"]:::teleop
-SendWP["bluebot.sh send-waypoints"]:::teleop
-SaveMap["bluebot.sh save-map"]:::teleop
+MODE_NAV --> NAV_LAUNCH
+NAV_LAUNCH --> NAV2_LAUNCH --> NAV2_STACK
+NAV_LAUNCH --> GRID_LOC
+NAV_LAUNCH --> AT_TF
+NAV_LAUNCH --> AT_LOC
+NAV_LAUNCH --> AT_CAM
+NAV_LAUNCH --> AT_BT
 
-%% ----------------- DATA FLOW -----------------
+ART_MAP --> NAV_LAUNCH
+ART_TAGS --> AT_TF
+LOCAL_EKF --> GLOBAL_EKF
+AT_LOC --> GLOBAL_EKF
+GRID_LOC --> GLOBAL_EKF
+GLOBAL_EKF --> NAV2_STACK
 
-%% --- Startup ---
-StartNav --> Stack
-StartMap --> Stack
+AT_CAM --> AT_LOC
+AT_BT --> NAV2_STACK
 
-%% --- Hardware & Sensors ---
-Stack --> Depth
-Stack --> VslamOdom
-Stack --> Scan
-Stack --> IMU
-Stack --> RealSense
-Stack --> SerialBridge
-Stack --> Motors
-Stack --> RSP
-Stack --> Teleop
-Stack --> Foxglove
-Stack --> EKF
-
-%% --- State Estimation ---
-EKF --> FusedOdom
-FusedOdom --> Nav2Stack
-
-%% --- Safety & Motion ---
-CmdIn --> Gate
-DropTopic --> Gate
-Gate --> CmdSafe
-CmdSafe --> SerialBridge
-
-%% --- VSLAM & Perception ---
-Depth --> DropDetector
-VslamOdom --> DropDetector
-DropDetector --> DropTopic
-RealSense --> VSLAM
-IMU --> VSLAM
-VSLAM --> VslamOdom
-
-%% --- SLAM / Mapping ---
-Scan --> SLAMTB
-SLAMTB --> MapTopic
-SLAMTB --> TFmap
-Depth --> Nvblox
-Nvblox --> LocalCM
-
-%% --- Nav2 ---
-Nav2Stack --> Planner
-Nav2Stack --> Controller
-Nav2Stack --> BT
-Planner --> Controller
-Controller --> CmdSafe
-BT --> Planner
-BT --> Controller
-MapTopic --> Nav2Stack
-TFmap --> Nav2Stack
-LocalCM --> Nav2Stack
-InitialPose --> Nav2Stack
-
-%% --- AMCL ---
-AMCL --> Nav2Stack
-FusedOdom --> AMCL
-
-%% --- Waypoints / Foxglove ---
-Waypoints --> WPBridge --> NavThroughPoses --> Nav2Stack
-WPBridge --> Status
-
-%% --- Waypoint Capture & Map Save ---
-TFmap --> CaptureWP --> WaypointsYAML
-WaypointsYAML --> SendWP --> Waypoints
-MapTopic --> SaveMap --> MapFiles
+%% ---------- NOTE ----------
+NOTE["Legacy packages bluebot_v2 / bluebot_v3 are removed.\nstraight_line_compensator_node now lives in robot_bringup."]:::artifacts
+ENTRY --- NOTE

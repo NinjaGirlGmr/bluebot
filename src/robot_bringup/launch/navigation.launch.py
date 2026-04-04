@@ -23,6 +23,7 @@ def generate_launch_description() -> LaunchDescription:
 
     map_file = LaunchConfiguration('map')
     params_file = LaunchConfiguration('params_file')
+    smoother_params_file = LaunchConfiguration('smoother_params_file')
     autostart = LaunchConfiguration('autostart')
     use_composition = LaunchConfiguration('use_composition')
     use_respawn = LaunchConfiguration('use_respawn')
@@ -45,6 +46,19 @@ def generate_launch_description() -> LaunchDescription:
         'state_estimation_fused_odom_topic'
     )
     state_estimation_params_file = LaunchConfiguration('state_estimation_params_file')
+    state_estimation_global_enabled = LaunchConfiguration('state_estimation_global_enabled')
+    state_estimation_global_params_file = LaunchConfiguration(
+        'state_estimation_global_params_file'
+    )
+    state_estimation_global_pose_topic = LaunchConfiguration(
+        'state_estimation_global_pose_topic'
+    )
+    state_estimation_global_initialpose_topic = LaunchConfiguration(
+        'state_estimation_global_initialpose_topic'
+    )
+    state_estimation_global_odom_topic = LaunchConfiguration(
+        'state_estimation_global_odom_topic'
+    )
     state_estimation_base_frame = LaunchConfiguration('state_estimation_base_frame')
     state_estimation_imu_frame = LaunchConfiguration('state_estimation_imu_frame')
 
@@ -69,7 +83,31 @@ def generate_launch_description() -> LaunchDescription:
     apriltag_behavior_params_file = LaunchConfiguration('apriltag_behavior_params_file')
     apriltag_behavior_rules_file = LaunchConfiguration('apriltag_behavior_rules_file')
     apriltag_landmarks_file = LaunchConfiguration('apriltag_landmarks_file')
+    apriltag_landmark_tf_enabled = LaunchConfiguration('apriltag_landmark_tf_enabled')
+    apriltag_landmark_tf_params_file = LaunchConfiguration('apriltag_landmark_tf_params_file')
+    apriltag_map_localization_enabled = LaunchConfiguration('apriltag_map_localization_enabled')
+    apriltag_map_localization_params_file = LaunchConfiguration(
+        'apriltag_map_localization_params_file'
+    )
     docking_params_file = LaunchConfiguration('docking_params_file')
+    grid_localization_enabled = LaunchConfiguration('grid_localization_enabled')
+    grid_localization_scan_topic = LaunchConfiguration('grid_localization_scan_topic')
+    grid_localization_output_topic = LaunchConfiguration('grid_localization_output_topic')
+    grid_localization_output_frame = LaunchConfiguration('grid_localization_output_frame')
+    grid_localization_fallback_enabled = LaunchConfiguration('grid_localization_fallback_enabled')
+    grid_localization_fallback_wait_sec = LaunchConfiguration('grid_localization_fallback_wait_sec')
+    grid_localization_fallback_publish_count = LaunchConfiguration(
+        'grid_localization_fallback_publish_count'
+    )
+    grid_localization_fallback_publish_period_sec = LaunchConfiguration(
+        'grid_localization_fallback_publish_period_sec'
+    )
+    grid_localization_fallback_x = LaunchConfiguration('grid_localization_fallback_x')
+    grid_localization_fallback_y = LaunchConfiguration('grid_localization_fallback_y')
+    grid_localization_fallback_yaw = LaunchConfiguration('grid_localization_fallback_yaw')
+    occupancy_grid_localizer_enabled = LaunchConfiguration(
+        'occupancy_grid_localizer_enabled'
+    )
 
     set_use_sim_time = SetParameter(
         name='use_sim_time',
@@ -114,6 +152,7 @@ def generate_launch_description() -> LaunchDescription:
             'use_sim_time': use_sim_time,
             'map': map_file,
             'params_file': params_file,
+            'smoother_params_file': smoother_params_file,
             'autostart': autostart,
             'use_composition': use_composition,
             'use_respawn': use_respawn,
@@ -129,6 +168,13 @@ def generate_launch_description() -> LaunchDescription:
             'state_estimation_imu_raw_topic': state_estimation_imu_raw_topic,
             'state_estimation_fused_odom_topic': state_estimation_fused_odom_topic,
             'state_estimation_params_file': state_estimation_params_file,
+            'state_estimation_global_enabled': state_estimation_global_enabled,
+            'state_estimation_global_params_file': state_estimation_global_params_file,
+            'state_estimation_global_pose_topic': state_estimation_global_pose_topic,
+            'state_estimation_global_initialpose_topic': (
+                state_estimation_global_initialpose_topic
+            ),
+            'state_estimation_global_odom_topic': state_estimation_global_odom_topic,
             'state_estimation_base_frame': state_estimation_base_frame,
             'state_estimation_imu_frame': state_estimation_imu_frame,
             'straight_comp_params_file': straight_comp_params_file,
@@ -144,6 +190,68 @@ def generate_launch_description() -> LaunchDescription:
             'udp_timeout_s': udp_timeout_s,
             'health_monitor_enabled': health_monitor_enabled,
             'health_params_file': health_params_file,
+        }.items(),
+    )
+
+    apriltag_landmark_tf = Node(
+        package='robot_bringup',
+        executable='apriltag_landmark_tf_publisher',
+        name='apriltag_landmark_tf_publisher',
+        output='screen',
+        condition=IfCondition(apriltag_landmark_tf_enabled),
+        parameters=[
+            apriltag_landmark_tf_params_file,
+            {
+                'use_sim_time': ParameterValue(use_sim_time, value_type=bool),
+                'map_yaml': map_file,
+                'landmarks_file': apriltag_landmarks_file,
+            },
+        ],
+    )
+
+    apriltag_map_localization = Node(
+        package='robot_bringup',
+        executable='apriltag_map_localization',
+        name='apriltag_map_localization',
+        output='screen',
+        condition=IfCondition(apriltag_map_localization_enabled),
+        parameters=[
+            apriltag_map_localization_params_file,
+            {
+                'use_sim_time': ParameterValue(use_sim_time, value_type=bool),
+                'map_yaml': map_file,
+                'landmarks_file': apriltag_landmarks_file,
+            },
+        ],
+    )
+
+    grid_localization = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            PathJoinSubstitution(
+                [
+                    FindPackageShare('isaac_nav2_pose_bridge'),
+                    'launch',
+                    'isaac_grid_localization_to_nav2.launch.py',
+                ]
+            )
+        ),
+        condition=IfCondition(grid_localization_enabled),
+        launch_arguments={
+            'map_yaml_path': map_file,
+            'use_sim_time': use_sim_time,
+            'scan_topic': grid_localization_scan_topic,
+            'output_topic': grid_localization_output_topic,
+            'output_frame_id': grid_localization_output_frame,
+            'fallback_initial_pose_enabled': grid_localization_fallback_enabled,
+            'fallback_initial_pose_wait_sec': grid_localization_fallback_wait_sec,
+            'fallback_initial_pose_publish_count': grid_localization_fallback_publish_count,
+            'fallback_initial_pose_publish_period_sec': (
+                grid_localization_fallback_publish_period_sec
+            ),
+            'fallback_initial_pose_x': grid_localization_fallback_x,
+            'fallback_initial_pose_y': grid_localization_fallback_y,
+            'fallback_initial_pose_yaw': grid_localization_fallback_yaw,
+            'occupancy_grid_localizer_enabled': occupancy_grid_localizer_enabled,
         }.items(),
     )
 
@@ -201,6 +309,12 @@ def generate_launch_description() -> LaunchDescription:
                 [FindPackageShare('robot_bringup'), 'config', 'nav2.yaml']
             ),
         ),
+        DeclareLaunchArgument(
+            'smoother_params_file',
+            default_value=PathJoinSubstitution(
+                [FindPackageShare('robot_bringup'), 'config', 'nav2_smoother.yaml']
+            ),
+        ),
         DeclareLaunchArgument('autostart', default_value='true'),
         DeclareLaunchArgument('use_composition', default_value='true'),
         DeclareLaunchArgument('use_respawn', default_value='false'),
@@ -233,6 +347,25 @@ def generate_launch_description() -> LaunchDescription:
         ),
         DeclareLaunchArgument('state_estimation_imu_raw_topic', default_value='/imu/data_raw'),
         DeclareLaunchArgument('state_estimation_fused_odom_topic', default_value='/odom'),
+        DeclareLaunchArgument('state_estimation_global_enabled', default_value='true'),
+        DeclareLaunchArgument(
+            'state_estimation_global_params_file',
+            default_value=PathJoinSubstitution(
+                [FindPackageShare('robot_bringup'), 'config', 'state_estimation_map_fusion.yaml']
+            ),
+        ),
+        DeclareLaunchArgument(
+            'state_estimation_global_pose_topic',
+            default_value='/apriltag/map_pose',
+        ),
+        DeclareLaunchArgument(
+            'state_estimation_global_initialpose_topic',
+            default_value='/initialpose',
+        ),
+        DeclareLaunchArgument(
+            'state_estimation_global_odom_topic',
+            default_value='/odometry/global',
+        ),
         DeclareLaunchArgument('state_estimation_base_frame', default_value='base_link'),
         DeclareLaunchArgument('state_estimation_imu_frame', default_value='imu_link'),
         DeclareLaunchArgument(
@@ -278,15 +411,44 @@ def generate_launch_description() -> LaunchDescription:
             ),
         ),
         DeclareLaunchArgument('apriltag_landmarks_file', default_value=''),
+        DeclareLaunchArgument('apriltag_landmark_tf_enabled', default_value='true'),
+        DeclareLaunchArgument(
+            'apriltag_landmark_tf_params_file',
+            default_value=PathJoinSubstitution(
+                [FindPackageShare('robot_bringup'), 'config', 'apriltag_landmark_tf.yaml']
+            ),
+        ),
+        DeclareLaunchArgument('apriltag_map_localization_enabled', default_value='true'),
+        DeclareLaunchArgument(
+            'apriltag_map_localization_params_file',
+            default_value=PathJoinSubstitution(
+                [FindPackageShare('robot_bringup'), 'config', 'apriltag_map_localization.yaml']
+            ),
+        ),
         DeclareLaunchArgument(
             'docking_params_file',
             default_value=PathJoinSubstitution(
                 [FindPackageShare('robot_bringup'), 'config', 'docking_server.yaml']
             ),
         ),
+        DeclareLaunchArgument('grid_localization_enabled', default_value='true'),
+        DeclareLaunchArgument('grid_localization_scan_topic', default_value='/scan'),
+        DeclareLaunchArgument('grid_localization_output_topic', default_value='/initialpose'),
+        DeclareLaunchArgument('grid_localization_output_frame', default_value='map'),
+        DeclareLaunchArgument('grid_localization_fallback_enabled', default_value='true'),
+        DeclareLaunchArgument('grid_localization_fallback_wait_sec', default_value='6.0'),
+        DeclareLaunchArgument('grid_localization_fallback_publish_count', default_value='5'),
+        DeclareLaunchArgument('grid_localization_fallback_publish_period_sec', default_value='0.5'),
+        DeclareLaunchArgument('grid_localization_fallback_x', default_value='0.0'),
+        DeclareLaunchArgument('grid_localization_fallback_y', default_value='0.0'),
+        DeclareLaunchArgument('grid_localization_fallback_yaw', default_value='0.0'),
+        DeclareLaunchArgument('occupancy_grid_localizer_enabled', default_value='true'),
         set_use_sim_time,
         sensors,
         apriltag_realsense,
+        apriltag_landmark_tf,
+        apriltag_map_localization,
         nav2_stack,
+        grid_localization,
         apriltag_behavior_tree,
     ])

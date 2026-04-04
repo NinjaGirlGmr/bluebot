@@ -1,71 +1,64 @@
 flowchart TD
 %% ---------- STYLE DEFINITIONS ----------
 classDef startup fill:#cce5ff,stroke:#3399ff,stroke-width:1px,color:#000;
-classDef hardware fill:#d1ecf1,stroke:#17a2b8,stroke-width:1px,color:#000;
+classDef launch fill:#e8f4ff,stroke:#3399ff,stroke-width:1px,color:#000;
 classDef sensors fill:#d4edda,stroke:#28a745,stroke-width:1px,color:#000;
-classDef vslam fill:#e2d9f3,stroke:#6f42c1,stroke-width:1px,color:#000;
-classDef teleop fill:#fff3cd,stroke:#ffc107,stroke-width:1px,color:#000;
+classDef hardware fill:#d1ecf1,stroke:#17a2b8,stroke-width:1px,color:#000;
 classDef nav2 fill:#f8d7da,stroke:#dc3545,stroke-width:1px,color:#000;
 classDef state fill:#f0f0f0,stroke:#6c757d,stroke-width:1px,color:#000;
+classDef apriltag fill:#fff3cd,stroke:#ff9800,stroke-width:1px,color:#000;
+classDef ops fill:#efe8ff,stroke:#6f42c1,stroke-width:1px,color:#000;
 
-%% ---------- STARTUP ----------
-A["bluebot start-nav <map_yaml>"]:::startup
-B["start_stack()"]:::startup
+%% ---------- ENTRYPOINT ----------
+A["bluebot_bringup.sh start navigation {map}"]:::startup
+B["robot_bringup/navigation.launch.py\nmap:=/maps/{name}.yaml"]:::launch
 
-%% ---------- HARDWARE ----------
-C["ros2_serial_diff_drive_bridge<br>odom_topic=/odom_raw, publish_tf=false"]:::hardware
-D["serial_diff_drive_hw bringup<br>controller_manager + controllers"]:::hardware
-E["robot_state_publisher"]:::hardware
+%% ---------- SHARED SENSORS ----------
+S1["sensors.launch.py\nLidar + IMU + sensor TFs"]:::sensors
 
-%% ---------- SENSORS ----------
-F["Lidar + static TF<br>/frame_id=laser, /scan"]:::sensors
-G["IMU node<br>/imu/data_raw, /imu/orientation"]:::sensors
-H["RealSense camera"]:::sensors
+%% ---------- NAV2 INCLUDE ----------
+subgraph NAV2INC["Included: nav2.launch.py"]
+N1["ros2_serial_diff_drive_bridge + serial_diff_drive_hw"]:::hardware
+N2["robot_localization_filter (local EKF)\n/odom_raw + imu -> /odom"]:::state
+N3["robot_localization_global_filter (global EKF)\n/odom + /apriltag/map_pose + /initialpose\n-> /odometry/global + map->odom TF"]:::state
+N4["straight_line_compensator\n/cmd_vel -> /cmd_vel_compensated"]:::state
+N5["SetParametersFromFile\nconfig/nav2_smoother.yaml"]:::nav2
+N6["nav2_bringup/bringup_launch.py"]:::nav2
+N7["Nav2 lifecycle nodes\nmap_server, amcl(tf_broadcast=false),\nplanner, controller, bt_navigator,\nbehavior_server, waypoint_follower, smoother_server"]:::nav2
+N8["health_monitor (nav2 profile)"]:::ops
+end
 
-%% ---------- VSLAM ----------
-I["Isaac ROS Visual SLAM<br>(direct or NITROS)"]:::vslam
+%% ---------- APRILTAG + GLOBAL LOCALIZATION ----------
+AT0["apriltag_realsense.launch.py (optional)\n/tag_detections"]:::apriltag
+AT1["apriltag_landmark_tf_publisher\nloads {map}.apriltags.yaml -> static TFs"]:::apriltag
+AT2["apriltag_map_localization\n/tag_detections + TF + landmarks -> /apriltag/map_pose"]:::apriltag
+AT3["isaac_grid_localization_to_nav2 (default enabled)\n/localization_result -> /initialpose"]:::apriltag
+AT4["apriltag_nav_behavior_tree\nrules + landmarks + map actions"]:::apriltag
 
-%% ---------- TELEOP & BRIDGE ----------
-J["teleop_twist_joy<br>/joy -> /cmd_vel"]:::teleop
-K["Foxglove Bridge"]:::teleop
+%% ---------- FLOW ----------
+A --> B
 
-%% ---------- STATE ESTIMATION ----------
-L["State Estimation<br>robot_localization EKF"]:::state
-N["Fused odom for Nav2<br>/odometry/filtered -> /odom"]:::state
+B -->|includes| S1
+B -->|includes| NAV2INC
+B -->|optional| AT0
+B -->|starts| AT1
+B -->|starts| AT2
+B -->|default enabled| AT3
+B -->|default enabled| AT4
 
-%% ---------- NAV2 ----------
-O["nav2_bringup bringup_launch.py<br>slam:=False, map=<map_yaml>"]:::nav2
-P["localization_launch.py<br>(AMCL)"]:::nav2
-Q["AMCL<br>odom_topic=/odom"]:::nav2
-R["navigation_launch.py"]:::nav2
-S["controller_server, planner_server, bt_navigator, costmaps"]:::nav2
+N1 -->|/odom_raw| N2
+N4 -->|/cmd_vel_compensated| N1
+N2 -->|/odom| N3
+N2 -->|/odom| N6
+N5 --> N6
+N6 --> N7
 
-%% ---------- OPTIONAL INITIAL POSE ----------
-T["optional: isaac grid localization bridge -> /initialpose"]:::vslam
+AT0 -->|/tag_detections| AT2
+AT1 -->|map landmark TFs| AT2
+AT2 -->|pose0=/apriltag/map_pose| N3
+AT3 -->|pose1=/initialpose| N3
+AT3 -->|/initialpose| N7
 
-%% ---------- DATA FLOW ----------
-
-A -->|start stack| B
-
-%% Hardware & sensors
-B -->|start serial bridge| C
-B -->|bringup diff drive hw| D
-B -->|start RSP| E
-B -->|start lidar| F
-B -->|start IMU| G
-B -->|start camera| H
-B -->|start VSLAM| I
-B -->|start teleop| J
-B -->|start foxglove bridge| K
-B -->|start EKF| L
-L -->|fused odometry| N
-
-%% NAV2 stack
-B -->|start nav2| O
-O -->|start localization| P
-P -->|AMCL odom| Q
-O -->|start navigation| R
-R -->|control & plan| S
-
-%% Optional initial pose
-B -->|optional initialpose| T
+N3 -->|map->odom TF| N7
+AT4 -->|may publish /initialpose or nav actions| N7
+N8 --> N6

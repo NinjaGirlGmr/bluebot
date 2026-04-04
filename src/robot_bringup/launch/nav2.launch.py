@@ -1,9 +1,9 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, GroupAction, IncludeLaunchDescription
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
-from launch_ros.actions import Node, SetParameter
+from launch_ros.actions import Node, SetParameter, SetParametersFromFile
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
@@ -22,6 +22,7 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time')
     map_file = LaunchConfiguration('map')
     params_file = LaunchConfiguration('params_file')
+    smoother_params_file = LaunchConfiguration('smoother_params_file')
     autostart = LaunchConfiguration('autostart')
     use_composition = LaunchConfiguration('use_composition')
     use_respawn = LaunchConfiguration('use_respawn')
@@ -37,6 +38,11 @@ def generate_launch_description():
     serial_cmd_vel_topic = LaunchConfiguration('serial_cmd_vel_topic')
     serial_odom_topic = LaunchConfiguration('serial_odom_topic')
     serial_publish_tf = LaunchConfiguration('serial_publish_tf')
+    serial_enable_stall_compensation = LaunchConfiguration('serial_enable_stall_compensation')
+    serial_min_effective_linear_mps = LaunchConfiguration('serial_min_effective_linear_mps')
+    serial_min_effective_angular_rad_s = LaunchConfiguration('serial_min_effective_angular_rad_s')
+    serial_min_effective_turn_wheel_mps = LaunchConfiguration('serial_min_effective_turn_wheel_mps')
+    serial_zero_cmd_epsilon = LaunchConfiguration('serial_zero_cmd_epsilon')
 
     state_estimation_imu_orientation_topic = LaunchConfiguration(
         'state_estimation_imu_orientation_topic'
@@ -48,6 +54,19 @@ def generate_launch_description():
         'state_estimation_fused_odom_topic'
     )
     state_estimation_params_file = LaunchConfiguration('state_estimation_params_file')
+    state_estimation_global_enabled = LaunchConfiguration('state_estimation_global_enabled')
+    state_estimation_global_params_file = LaunchConfiguration(
+        'state_estimation_global_params_file'
+    )
+    state_estimation_global_pose_topic = LaunchConfiguration(
+        'state_estimation_global_pose_topic'
+    )
+    state_estimation_global_initialpose_topic = LaunchConfiguration(
+        'state_estimation_global_initialpose_topic'
+    )
+    state_estimation_global_odom_topic = LaunchConfiguration(
+        'state_estimation_global_odom_topic'
+    )
     state_estimation_base_frame = LaunchConfiguration('state_estimation_base_frame')
     state_estimation_imu_frame = LaunchConfiguration('state_estimation_imu_frame')
 
@@ -74,25 +93,36 @@ def generate_launch_description():
     nav2_use_composition = _to_python_bool(use_composition)
     nav2_use_respawn = _to_python_bool(use_respawn)
 
-    serial_bridge = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            PathJoinSubstitution(
-                [
-                    FindPackageShare('ros2_serial_diff_drive_bridge'),
-                    'launch',
-                    'ros2_serial_diff_drive_bridge.launch.py',
-                ]
-            )
-        ),
+    # Isolate launch args to avoid leaking serial bridge "params_file" into Nav2 bringup.
+    serial_bridge = GroupAction(
         condition=IfCondition(drive_stack_enabled),
-        launch_arguments={
+        forwarding=False,
+        launch_configurations={
             'params_file': serial_bridge_params_file,
             'port': serial_port,
             'baud': serial_baud,
             'cmd_vel_topic': serial_cmd_vel_topic,
             'odom_topic': serial_odom_topic,
             'publish_tf': serial_publish_tf,
-        }.items(),
+            'enable_stall_compensation': serial_enable_stall_compensation,
+            'min_effective_linear_mps': serial_min_effective_linear_mps,
+            'min_effective_angular_rad_s': serial_min_effective_angular_rad_s,
+            'min_effective_turn_wheel_mps': serial_min_effective_turn_wheel_mps,
+            'zero_cmd_epsilon': serial_zero_cmd_epsilon,
+        },
+        actions=[
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    PathJoinSubstitution(
+                        [
+                            FindPackageShare('ros2_serial_diff_drive_bridge'),
+                            'launch',
+                            'ros2_serial_diff_drive_bridge.launch.py',
+                        ]
+                    )
+                ),
+            ),
+        ],
     )
 
     serial_diff_drive_hw = IncludeLaunchDescription(
@@ -136,8 +166,26 @@ def generate_launch_description():
         remappings=[('/odometry/filtered', state_estimation_fused_odom_topic)],
     )
 
+    state_estimation_global = Node(
+        package='robot_localization',
+        executable='ekf_node',
+        name='robot_localization_global_filter',
+        output='screen',
+        condition=IfCondition(state_estimation_global_enabled),
+        parameters=[
+            state_estimation_global_params_file,
+            {
+                'use_sim_time': ParameterValue(use_sim_time, value_type=bool),
+                'odom0': state_estimation_fused_odom_topic,
+                'pose0': state_estimation_global_pose_topic,
+                'pose1': state_estimation_global_initialpose_topic,
+            },
+        ],
+        remappings=[('/odometry/filtered', state_estimation_global_odom_topic)],
+    )
+
     straight_line_compensator = Node(
-        package='bluebot_v3',
+        package='robot_bringup',
         executable='straight_line_compensator_node',
         name='straight_line_compensator',
         output='screen',
@@ -171,22 +219,27 @@ def generate_launch_description():
         ],
     )
 
-    nav2_bringup = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            PathJoinSubstitution(
-                [FindPackageShare('nav2_bringup'), 'launch', 'bringup_launch.py']
-            )
-        ),
-        launch_arguments={
-            'slam': 'False',
-            'map': map_file,
-            'use_sim_time': nav2_use_sim_time,
-            'params_file': params_file,
-            'autostart': nav2_autostart,
-            'use_composition': nav2_use_composition,
-            'use_respawn': nav2_use_respawn,
-            'log_level': log_level,
-        }.items(),
+    nav2_bringup = GroupAction(
+        actions=[
+            SetParametersFromFile(smoother_params_file),
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    PathJoinSubstitution(
+                        [FindPackageShare('nav2_bringup'), 'launch', 'bringup_launch.py']
+                    )
+                ),
+                launch_arguments={
+                    'slam': 'False',
+                    'map': map_file,
+                    'use_sim_time': nav2_use_sim_time,
+                    'params_file': params_file,
+                    'autostart': nav2_autostart,
+                    'use_composition': nav2_use_composition,
+                    'use_respawn': nav2_use_respawn,
+                    'log_level': log_level,
+                }.items(),
+            ),
+        ]
     )
 
     health_monitor = Node(
@@ -205,6 +258,12 @@ def generate_launch_description():
             'params_file',
             default_value=PathJoinSubstitution(
                 [FindPackageShare('robot_bringup'), 'config', 'nav2.yaml']
+            ),
+        ),
+        DeclareLaunchArgument(
+            'smoother_params_file',
+            default_value=PathJoinSubstitution(
+                [FindPackageShare('robot_bringup'), 'config', 'nav2_smoother.yaml']
             ),
         ),
         DeclareLaunchArgument('autostart', default_value='true'),
@@ -227,6 +286,11 @@ def generate_launch_description():
         DeclareLaunchArgument('serial_cmd_vel_topic', default_value='/cmd_vel_compensated'),
         DeclareLaunchArgument('serial_odom_topic', default_value='/odom_raw'),
         DeclareLaunchArgument('serial_publish_tf', default_value='false'),
+        DeclareLaunchArgument('serial_enable_stall_compensation', default_value='true'),
+        DeclareLaunchArgument('serial_min_effective_linear_mps', default_value='0.14'),
+        DeclareLaunchArgument('serial_min_effective_angular_rad_s', default_value='0.25'),
+        DeclareLaunchArgument('serial_min_effective_turn_wheel_mps', default_value='0.10'),
+        DeclareLaunchArgument('serial_zero_cmd_epsilon', default_value='0.0001'),
         DeclareLaunchArgument(
             'state_estimation_params_file',
             default_value=PathJoinSubstitution(
@@ -239,6 +303,25 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument('state_estimation_imu_raw_topic', default_value='/imu/data_raw'),
         DeclareLaunchArgument('state_estimation_fused_odom_topic', default_value='/odom'),
+        DeclareLaunchArgument('state_estimation_global_enabled', default_value='true'),
+        DeclareLaunchArgument(
+            'state_estimation_global_params_file',
+            default_value=PathJoinSubstitution(
+                [FindPackageShare('robot_bringup'), 'config', 'state_estimation_map_fusion.yaml']
+            ),
+        ),
+        DeclareLaunchArgument(
+            'state_estimation_global_pose_topic',
+            default_value='/apriltag/map_pose',
+        ),
+        DeclareLaunchArgument(
+            'state_estimation_global_initialpose_topic',
+            default_value='/initialpose',
+        ),
+        DeclareLaunchArgument(
+            'state_estimation_global_odom_topic',
+            default_value='/odometry/global',
+        ),
         DeclareLaunchArgument('state_estimation_base_frame', default_value='base_link'),
         DeclareLaunchArgument('state_estimation_imu_frame', default_value='imu_link'),
         DeclareLaunchArgument(
@@ -274,6 +357,7 @@ def generate_launch_description():
         serial_diff_drive_hw,
         imu_to_base_tf,
         state_estimation,
+        state_estimation_global,
         straight_line_compensator,
         udp_cmd_vel_bridge,
         nav2_bringup,

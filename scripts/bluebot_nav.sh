@@ -132,7 +132,7 @@ resolve_map_yaml() {
 
   if [[ -z "$candidate" ]]; then
     echo "No saved maps found in $MAP_DIR." >&2
-    echo "Create one first with: /ssd/ros2_ws/scripts/bluebot_mapper.sh save-map <name>" >&2
+    echo "Create one first with: /ssd/ros2_ws/scripts/bluebot_bringup.sh save-map <name>" >&2
     return 1
   fi
 
@@ -150,7 +150,7 @@ list_maps() {
 
   if [[ -z "$maps" ]]; then
     echo "No saved maps found in $MAP_DIR."
-    echo "Create one with: /ssd/ros2_ws/scripts/bluebot_mapper.sh save-map <name>"
+    echo "Create one with: /ssd/ros2_ws/scripts/bluebot_bringup.sh save-map <name>"
     return 1
   fi
 
