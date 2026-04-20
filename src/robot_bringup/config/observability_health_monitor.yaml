@@ -6,13 +6,10 @@ health_monitor:
     hardware_id: robot_bringup_observability
 
     topic_names:
-      - /rosout
       - /diagnostics
     topic_types:
-      - rcl_interfaces/msg/Log
       - diagnostic_msgs/msg/DiagnosticArray
     topic_timeouts_sec:
-      - 5.0
       - 3.0
 
     expected_nodes:

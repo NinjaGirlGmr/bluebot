@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Example BT: navigate anywhere in the map, then dock at a named dock.
+
+  Prerequisites:
+    - bt_navigator plugin_lib_names includes "bluebot_bt_plugins"
+    - docking_server is running (started by navigation.launch.py)
+    - dock_id is written to the blackboard before this tree is ticked
+      (e.g. set by the dock_command_node topic trigger, or via a SetBlackboard node)
+
+  Dock IDs for this robot:
+    "25"  →  pose [0.3, 0.3, 0.0]  (NonChargingDock)
+    "26"  →  pose [-7.8, 5.1, 0.1] (NonChargingDock)
+-->
+<root BTCPP_format="4" main_tree_to_execute="DockById">
+
+  <BehaviorTree ID="DockById">
+    <Sequence name="NavigateAndDock">
+
+      <!-- Navigate to the dock's staging pose (Nav2 plans the full path) -->
+      <!-- DockRobotById handles this internally when navigate_to_staging_pose=true -->
+
+      <!-- Dock the robot at the named dock -->
+      <DockRobotById
+        action_name="dock_robot"
+        server_timeout="5000"
+        dock_id="{dock_id}"
+        navigate_to_staging_pose="true"
+        max_staging_time="120.0"
+        success="{dock_success}"
+        error_code="{dock_error_code}"
+        num_retries="{dock_retries}"/>
+
+    </Sequence>
+  </BehaviorTree>
+
+  <!--
+    Standalone dock-with-recovery variant:
+    Retries docking up to 3 times if aborted.
+  -->
+  <BehaviorTree ID="DockByIdWithRetry">
+    <RetryUntilSuccessful num_attempts="3">
+      <DockRobotById
+        action_name="dock_robot"
+        server_timeout="5000"
+        dock_id="{dock_id}"
+        navigate_to_staging_pose="true"
+        max_staging_time="120.0"
+        success="{dock_success}"
+        error_code="{dock_error_code}"
+        num_retries="{dock_retries}"/>
+    </RetryUntilSuccessful>
+  </BehaviorTree>
+
+</root>

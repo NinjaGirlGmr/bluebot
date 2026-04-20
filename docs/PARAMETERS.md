@@ -102,6 +102,9 @@ Sources:
 | `apriltag_map_recorder.require_stationary` | `true` | Rejects samples while robot motion exceeds thresholds. |
 | `apriltag_map_recorder.min_detection_range_m / max_detection_range_m` | `0.10 / 2.50` | Distance gate for mapping-time landmark recording. |
 | `apriltag_map_recorder.use_covariance_filter` | `true` | Rejects low-confidence detections based on covariance thresholds. |
+| `apriltag_map_recorder.publish_landmarks_topic` | `true` | Publishes registered map landmarks as `/apriltag/landmarks` PoseArray. |
+| `apriltag_map_recorder.publish_landmark_tf` | `true` | Publishes `map -> apriltag_landmark/*` TF for registered tags during mapping. |
+| `apriltag_map_recorder.landmark_tf_child_frame_prefix` | `apriltag_landmark` | Prefix for mapping-time landmark TF child frames. |
 | `apriltag_map_localization.output_pose_topic` | `/apriltag/map_pose` | Global pose output fused by global EKF. |
 | `apriltag_map_localization.auto_landmarks_from_map` | `true` | Auto-resolves `<map>.apriltags.yaml` when `landmarks_file` is empty. |
 | `apriltag_map_localization.use_landmark_yaw` | `true` | Uses saved landmark orientation when solving map pose. |
@@ -124,7 +127,7 @@ Sources:
 | `apriltag_map_localization_enabled` | `true` | Enables AprilTag-based global pose publishing. |
 | `grid_localization_enabled` | `true` | Enables Isaac occupancy-grid localization bridge to `/initialpose`. |
 | `apriltag_realsense_enabled` | `false` | Leaves camera/tag detector pipeline off unless explicitly enabled. |
-| `apriltag_map_recorder_enabled` | `false` | Leaves mapping recorder off unless explicitly enabled. |
+| `apriltag_map_recorder_enabled` | `true` | Enables mapping recorder by default (can be disabled per launch). |
 
 ## Optional / Legacy Stack (Used by `bluebot.sh` Map-Explore Flows)
 

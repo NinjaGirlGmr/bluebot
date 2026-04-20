@@ -95,6 +95,10 @@ def _launch_setup(context, *args, **kwargs):
     )
     output_topic = LaunchConfiguration('output_topic').perform(context)
     output_frame_id = LaunchConfiguration('output_frame_id').perform(context)
+    use_current_output_stamp = _as_bool(
+        LaunchConfiguration('use_current_output_stamp').perform(context)
+    )
+    set_pose_topic = LaunchConfiguration('set_pose_topic').perform(context)
     pose_stamped_topic = LaunchConfiguration('pose_stamped_topic').perform(context)
     pose_with_covariance_topic = LaunchConfiguration('pose_with_covariance_topic').perform(
         context
@@ -205,6 +209,8 @@ def _launch_setup(context, *args, **kwargs):
                 'enable_pose_stamped_input': enable_pose_stamped_input,
                 'enable_pose_with_covariance_input': enable_pose_with_covariance_input,
                 'output_frame_id': output_frame_id,
+                'use_current_output_stamp': use_current_output_stamp,
+                'set_pose_topic': set_pose_topic,
                 'fallback_initial_pose_enabled': fallback_initial_pose_enabled,
                 'fallback_initial_pose_wait_sec': fallback_initial_pose_wait_sec,
                 'fallback_initial_pose_publish_count': fallback_initial_pose_publish_count,
@@ -259,6 +265,19 @@ def generate_launch_description():
                 'output_frame_id',
                 default_value='map',
                 description='Frame ID stamped on outgoing initial pose.',
+            ),
+            DeclareLaunchArgument(
+                'use_current_output_stamp',
+                default_value='false',
+                description=(
+                    'If true, restamp outgoing pose with current time. '
+                    'If false, preserve source timestamp from localization output.'
+                ),
+            ),
+            DeclareLaunchArgument(
+                'set_pose_topic',
+                default_value='/set_pose_global',
+                description='Topic used to snap global EKF pose directly.',
             ),
             DeclareLaunchArgument(
                 'pose_stamped_topic',

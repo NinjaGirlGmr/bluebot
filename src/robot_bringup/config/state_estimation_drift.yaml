@@ -8,6 +8,7 @@ robot_localization_filter:
     publish_tf: true
     print_diagnostics: false
     use_control: false
+    predict_to_current_time: true
     reset_on_time_jump: true
     transform_time_offset: 0.0
     transform_timeout: 0.0
@@ -19,7 +20,7 @@ robot_localization_filter:
 
     # Primary pose source: wheel odometry.
     odom0: /odom_raw
-    odom0_queue_size: 20
+    odom0_queue_size: 10
     odom0_differential: false
     odom0_relative: false
     odom0_config: [
@@ -46,7 +47,7 @@ robot_localization_filter:
 
     # Odom drift mitigation: use IMU yaw-rate only.
     imu1: /imu/data_raw
-    imu1_queue_size: 20
+    imu1_queue_size: 10
     imu1_differential: false
     imu1_relative: false
     imu1_remove_gravitational_acceleration: true

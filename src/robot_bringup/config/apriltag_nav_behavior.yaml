@@ -5,7 +5,6 @@ apriltag_nav_behavior_tree:
     cmd_vel_topic: /cmd_vel
     initial_pose_topic: /initialpose
     navigate_to_pose_action: /navigate_to_pose
-    rules_file: ""
     lifecycle_manager_service: /lifecycle_manager_navigation/manage_nodes
     docking_default_timeout_sec: 12.0
     docking_default_target_range_m: 0.30
@@ -16,10 +15,14 @@ apriltag_nav_behavior_tree:
     docking_lidar_power_control_enabled: true
     lidar_stop_motor_service: /stop_motor
     lidar_start_motor_service: /start_motor
-    landmarks_file: ""
-    map_yaml: ""
     auto_landmarks_from_map: true
     use_landmark_yaw: true
+    auto_relocalize_on_landmarks: false
+    auto_relocalize_max_range_m: 2.0
+    auto_relocalize_covariance_xy: 0.25
+    auto_relocalize_covariance_yaw: 0.0685
+    auto_relocalize_cooldown_sec: 20.0
+    auto_relocalize_priority: 50
     tick_rate_hz: 5.0
     detection_timeout_sec: 0.75
     default_cooldown_sec: 8.0

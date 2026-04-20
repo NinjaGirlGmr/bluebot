@@ -1,0 +1,11 @@
+docks:
+  25:
+    type: "NonChargingDock"
+    frame: map
+    pose: [0.3, 0.3, 0.0]
+    id: "25"
+  9:
+    type: "NonChargingDock"
+    frame: map
+    pose: [3.1, -3.3, 0.05]
+    id: "9"

@@ -5,10 +5,13 @@ from pathlib import Path
 import re
 from typing import Dict, Tuple
 
+from geometry_msgs.msg import Pose
+from geometry_msgs.msg import PoseArray
 from geometry_msgs.msg import TransformStamped
 import rclpy
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
 import yaml
 
@@ -36,6 +39,9 @@ class AprilTagLandmarkTFPublisherNode(Node):
         self.declare_parameter('map_yaml', '')
         self.declare_parameter('auto_landmarks_from_map', True)
         self.declare_parameter('child_frame_prefix', 'apriltag_landmark')
+        self.declare_parameter('publish_landmarks_topic', True)
+        self.declare_parameter('landmarks_topic', '/apriltag/landmarks')
+        self.declare_parameter('landmarks_publish_period_sec', 1.0)
 
         self._map_frame = str(self.get_parameter('map_frame').value)
         self._landmarks_file_param = str(self.get_parameter('landmarks_file').value)
@@ -44,24 +50,56 @@ class AprilTagLandmarkTFPublisherNode(Node):
             self.get_parameter('auto_landmarks_from_map').value
         )
         self._child_frame_prefix = str(self.get_parameter('child_frame_prefix').value).strip('/')
+        self._publish_landmarks_topic = bool(
+            self.get_parameter('publish_landmarks_topic').value
+        )
+        self._landmarks_topic = str(self.get_parameter('landmarks_topic').value).strip()
+        self._landmarks_publish_period_sec = float(
+            self.get_parameter('landmarks_publish_period_sec').value
+        )
 
         self._landmarks_by_family_id: Dict[Tuple[str, int], TagLandmark] = {}
         self._landmarks_by_id: Dict[int, TagLandmark] = {}
         self._resolved_landmarks_file = self._resolve_landmarks_file_path()
         self._load_landmarks(self._resolved_landmarks_file)
 
+        self._landmarks_pub = None
+        self._landmarks_timer = None
+        if self._publish_landmarks_topic and self._landmarks_topic:
+            qos = QoSProfile(depth=1)
+            qos.reliability = ReliabilityPolicy.RELIABLE
+            qos.durability = DurabilityPolicy.TRANSIENT_LOCAL
+            self._landmarks_pub = self.create_publisher(PoseArray, self._landmarks_topic, qos)
+
         self._tf_broadcaster = StaticTransformBroadcaster(self)
         transforms = self._build_transforms()
+        now = self.get_clock().now().to_msg()
         if transforms:
             self._tf_broadcaster.sendTransform(transforms)
+            self._publish_landmarks_pose_array(stamp=now)
             self.get_logger().info(
                 f'Published {len(transforms)} static landmark transforms from '
                 f'"{self._resolved_landmarks_file}"'
             )
         else:
+            self._publish_landmarks_pose_array(stamp=now)
             self.get_logger().warning(
                 f'No landmark transforms were published. '
                 f'landmarks_file="{self._resolved_landmarks_file}"'
+            )
+
+        if (
+            self._landmarks_pub is not None
+            and self._landmarks_publish_period_sec > 0.0
+            and self._landmarks_by_family_id
+        ):
+            self._landmarks_timer = self.create_timer(
+                self._landmarks_publish_period_sec,
+                self._on_landmarks_timer,
+            )
+            self.get_logger().info(
+                f'Publishing /apriltag/landmarks every '
+                f'{self._landmarks_publish_period_sec:.2f}s'
             )
 
     def _resolve_landmarks_file_path(self) -> str:
@@ -136,6 +174,34 @@ class AprilTagLandmarkTFPublisherNode(Node):
         self.get_logger().info(
             f'Loaded {len(self._landmarks_by_family_id)} landmark entries from {file_path}'
         )
+
+    def _publish_landmarks_pose_array(self, stamp=None) -> None:
+        if self._landmarks_pub is None:
+            return
+
+        if stamp is None:
+            stamp = self.get_clock().now().to_msg()
+
+        pose_array = PoseArray()
+        pose_array.header.stamp = stamp
+        pose_array.header.frame_id = self._map_frame
+        for landmark in self._landmarks_by_family_id.values():
+            pose = Pose()
+            pose.position.x = landmark.x
+            pose.position.y = landmark.y
+            pose.position.z = landmark.z
+            qx, qy, qz, qw = self._quat_normalize(
+                (landmark.qx, landmark.qy, landmark.qz, landmark.qw)
+            )
+            pose.orientation.x = qx
+            pose.orientation.y = qy
+            pose.orientation.z = qz
+            pose.orientation.w = qw
+            pose_array.poses.append(pose)
+        self._landmarks_pub.publish(pose_array)
+
+    def _on_landmarks_timer(self) -> None:
+        self._publish_landmarks_pose_array()
 
     def _build_transforms(self) -> list[TransformStamped]:
         transforms: list[TransformStamped] = []

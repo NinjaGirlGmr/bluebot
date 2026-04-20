@@ -5,8 +5,6 @@ apriltag_map_localization:
     output_pose_topic: /apriltag/map_pose
     map_frame: map
     base_frame: base_link
-    landmarks_file: ""
-    map_yaml: ""
     auto_landmarks_from_map: true
     use_landmark_yaw: true
     min_detection_range_m: 0.05

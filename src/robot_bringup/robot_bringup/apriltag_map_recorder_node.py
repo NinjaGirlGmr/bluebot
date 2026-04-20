@@ -3,8 +3,10 @@
 from dataclasses import dataclass
 from pathlib import Path
 import math
+import re
 from typing import Dict, Tuple
 
+from geometry_msgs.msg import Pose, PoseArray, TransformStamped
 from nav_msgs.msg import Odometry
 import rclpy
 from isaac_ros_apriltag_interfaces.msg import AprilTagDetectionArray
@@ -13,7 +15,7 @@ from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from rclpy.time import Time
-from tf2_ros import Buffer, TransformException, TransformListener
+from tf2_ros import Buffer, TransformBroadcaster, TransformException, TransformListener
 import yaml
 
 
@@ -48,6 +50,22 @@ class TagTrackState:
     last_seen_time_ns: int = 0
 
 
+@dataclass
+class TagLandmark:
+    family: str
+    tag_id: int
+    observations: int
+    first_seen_sec: float
+    last_seen_sec: float
+    x: float
+    y: float
+    z: float
+    qx: float
+    qy: float
+    qz: float
+    qw: float
+
+
 class AprilTagMapRecorderNode(Node):
     def __init__(self) -> None:
         super().__init__('apriltag_map_recorder')
@@ -74,6 +92,11 @@ class AprilTagMapRecorderNode(Node):
         self.declare_parameter('write_on_shutdown', True)
         self.declare_parameter('log_new_tags', True)
         self.declare_parameter('log_rejections', False)
+        self.declare_parameter('publish_landmarks_topic', True)
+        self.declare_parameter('landmarks_topic', '/apriltag/landmarks')
+        self.declare_parameter('publish_landmark_tf', True)
+        self.declare_parameter('landmark_tf_child_frame_prefix', 'apriltag_landmark')
+        self.declare_parameter('landmark_publish_period_sec', 0.50)
 
         self._detections_topic = str(self.get_parameter('detections_topic').value)
         self._odom_topic = str(self.get_parameter('odom_topic').value)
@@ -113,6 +136,17 @@ class AprilTagMapRecorderNode(Node):
         self._write_on_shutdown = bool(self.get_parameter('write_on_shutdown').value)
         self._log_new_tags = bool(self.get_parameter('log_new_tags').value)
         self._log_rejections = bool(self.get_parameter('log_rejections').value)
+        self._publish_landmarks_topic = bool(
+            self.get_parameter('publish_landmarks_topic').value
+        )
+        self._landmarks_topic = str(self.get_parameter('landmarks_topic').value)
+        self._publish_landmark_tf = bool(self.get_parameter('publish_landmark_tf').value)
+        self._landmark_tf_child_frame_prefix = str(
+            self.get_parameter('landmark_tf_child_frame_prefix').value
+        ).strip('/')
+        self._landmark_publish_period_sec = float(
+            self.get_parameter('landmark_publish_period_sec').value
+        )
 
         if self._write_period_sec <= 0.0:
             self._write_period_sec = 5.0
@@ -136,6 +170,8 @@ class AprilTagMapRecorderNode(Node):
             self._max_detection_position_stddev_m = 0.20
         if self._max_detection_yaw_stddev_rad <= 0.0:
             self._max_detection_yaw_stddev_rad = 0.35
+        if self._landmark_publish_period_sec <= 0.0:
+            self._landmark_publish_period_sec = 0.50
 
         self._tag_data: Dict[str, TagAggregate] = {}
         self._tag_track: Dict[str, TagTrackState] = {}
@@ -150,6 +186,12 @@ class AprilTagMapRecorderNode(Node):
 
         self._tf_buffer = Buffer(cache_time=Duration(seconds=30.0))
         self._tf_listener = TransformListener(self._tf_buffer, self)
+        self._landmarks_pub = None
+        if self._publish_landmarks_topic:
+            self._landmarks_pub = self.create_publisher(PoseArray, self._landmarks_topic, 10)
+        self._landmark_tf_broadcaster = (
+            TransformBroadcaster(self) if self._publish_landmark_tf else None
+        )
 
         self.create_subscription(
             Odometry,
@@ -164,12 +206,19 @@ class AprilTagMapRecorderNode(Node):
             qos_profile_sensor_data,
         )
         self.create_timer(self._write_period_sec, self._on_write_timer)
+        if self._landmarks_pub is not None or self._landmark_tf_broadcaster is not None:
+            self.create_timer(
+                self._landmark_publish_period_sec,
+                self._on_landmarks_publish_timer,
+            )
 
         self.get_logger().info(
             'AprilTag map recorder started. '
             f'detections_topic={self._detections_topic}, map_frame={self._map_frame}, '
             f'output_yaml={self._output_yaml}, require_stationary={self._require_stationary}, '
-            f'min_consecutive={self._min_consecutive_detections}'
+            f'min_consecutive={self._min_consecutive_detections}, '
+            f'publish_landmarks_topic={self._publish_landmarks_topic}, '
+            f'publish_landmark_tf={self._publish_landmark_tf}'
         )
 
     def _on_odom(self, msg: Odometry) -> None:
@@ -382,6 +431,9 @@ class AprilTagMapRecorderNode(Node):
     def _on_write_timer(self) -> None:
         self.write_yaml_snapshot(force=False)
 
+    def _on_landmarks_publish_timer(self) -> None:
+        self._publish_registered_landmarks()
+
     def write_yaml_snapshot(self, force: bool) -> None:
         if not force and not self._dirty:
             return
@@ -389,14 +441,9 @@ class AprilTagMapRecorderNode(Node):
         output_path = Path(self._output_yaml).expanduser()
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
+        landmarks = self._build_registered_landmarks()
         tags = []
-        for item in self._sorted_tag_items():
-            if item.observations < self._min_observations:
-                continue
-            inv_count = 1.0 / float(item.observations)
-            avg_q = self._quat_normalize(
-                (item.sum_qx, item.sum_qy, item.sum_qz, item.sum_qw)
-            )
+        for item in landmarks:
             tags.append({
                 'family': item.family,
                 'id': item.tag_id,
@@ -404,15 +451,15 @@ class AprilTagMapRecorderNode(Node):
                 'first_seen_sec': round(item.first_seen_sec, 6),
                 'last_seen_sec': round(item.last_seen_sec, 6),
                 'position': {
-                    'x': round(item.sum_x * inv_count, 6),
-                    'y': round(item.sum_y * inv_count, 6),
-                    'z': round(item.sum_z * inv_count, 6),
+                    'x': round(item.x, 6),
+                    'y': round(item.y, 6),
+                    'z': round(item.z, 6),
                 },
                 'orientation': {
-                    'x': round(avg_q[0], 6),
-                    'y': round(avg_q[1], 6),
-                    'z': round(avg_q[2], 6),
-                    'w': round(avg_q[3], 6),
+                    'x': round(item.qx, 6),
+                    'y': round(item.qy, 6),
+                    'z': round(item.qz, 6),
+                    'w': round(item.qw, 6),
                 },
             })
 
@@ -426,6 +473,10 @@ class AprilTagMapRecorderNode(Node):
             'require_stationary': self._require_stationary,
             'max_robot_linear_speed_mps': self._max_robot_linear_speed_mps,
             'max_robot_angular_speed_rad_s': self._max_robot_angular_speed_rad_s,
+            'publish_landmarks_topic': self._publish_landmarks_topic,
+            'landmarks_topic': self._landmarks_topic,
+            'publish_landmark_tf': self._publish_landmark_tf,
+            'landmark_tf_child_frame_prefix': self._landmark_tf_child_frame_prefix,
             'tags': tags,
         }
 
@@ -444,6 +495,86 @@ class AprilTagMapRecorderNode(Node):
             self._tag_data.values(),
             key=lambda item: (item.family, item.tag_id),
         )
+
+    def _build_registered_landmarks(self) -> list[TagLandmark]:
+        landmarks: list[TagLandmark] = []
+        for item in self._sorted_tag_items():
+            if item.observations < self._min_observations:
+                continue
+            inv_count = 1.0 / float(item.observations)
+            avg_q = self._quat_normalize(
+                (item.sum_qx, item.sum_qy, item.sum_qz, item.sum_qw)
+            )
+            landmarks.append(
+                TagLandmark(
+                    family=item.family,
+                    tag_id=item.tag_id,
+                    observations=item.observations,
+                    first_seen_sec=item.first_seen_sec,
+                    last_seen_sec=item.last_seen_sec,
+                    x=item.sum_x * inv_count,
+                    y=item.sum_y * inv_count,
+                    z=item.sum_z * inv_count,
+                    qx=avg_q[0],
+                    qy=avg_q[1],
+                    qz=avg_q[2],
+                    qw=avg_q[3],
+                )
+            )
+        return landmarks
+
+    def _publish_registered_landmarks(self) -> None:
+        landmarks = self._build_registered_landmarks()
+        now_msg = self.get_clock().now().to_msg()
+
+        if self._landmarks_pub is not None:
+            pose_array = PoseArray()
+            pose_array.header.stamp = now_msg
+            pose_array.header.frame_id = self._map_frame
+            for landmark in landmarks:
+                pose = Pose()
+                pose.position.x = landmark.x
+                pose.position.y = landmark.y
+                pose.position.z = landmark.z
+                pose.orientation.x = landmark.qx
+                pose.orientation.y = landmark.qy
+                pose.orientation.z = landmark.qz
+                pose.orientation.w = landmark.qw
+                pose_array.poses.append(pose)
+            self._landmarks_pub.publish(pose_array)
+
+        if self._landmark_tf_broadcaster is not None:
+            tf_msgs: list[TransformStamped] = []
+            for landmark in landmarks:
+                tf_msg = TransformStamped()
+                tf_msg.header.stamp = now_msg
+                tf_msg.header.frame_id = self._map_frame
+                tf_msg.child_frame_id = self._landmark_child_frame(
+                    family=landmark.family,
+                    tag_id=landmark.tag_id,
+                )
+                tf_msg.transform.translation.x = landmark.x
+                tf_msg.transform.translation.y = landmark.y
+                tf_msg.transform.translation.z = landmark.z
+                tf_msg.transform.rotation.x = landmark.qx
+                tf_msg.transform.rotation.y = landmark.qy
+                tf_msg.transform.rotation.z = landmark.qz
+                tf_msg.transform.rotation.w = landmark.qw
+                tf_msgs.append(tf_msg)
+            if tf_msgs:
+                self._landmark_tf_broadcaster.sendTransform(tf_msgs)
+
+    def _landmark_child_frame(self, family: str, tag_id: int) -> str:
+        frame_suffix = self._sanitize_frame_component(f'{family}_{tag_id}')
+        if not self._landmark_tf_child_frame_prefix:
+            return frame_suffix
+        return f'{self._landmark_tf_child_frame_prefix}/{frame_suffix}'
+
+    @staticmethod
+    def _sanitize_frame_component(raw: str) -> str:
+        cleaned = re.sub(r'[^A-Za-z0-9_]+', '_', raw)
+        cleaned = re.sub(r'_+', '_', cleaned).strip('_')
+        return cleaned or 'tag'
 
     def _update_track_state(self, key: str, now_ns: int) -> TagTrackState:
         state = self._tag_track.get(key)

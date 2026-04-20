@@ -16,7 +16,7 @@ Script path:
 
 ```bash
 bluebot_bringup.sh start <mode> [mode args] [extra ros2 launch args...]
-bluebot_bringup.sh stop
+bluebot_bringup.sh stop [all|primary|observability]
 bluebot_bringup.sh restart <mode> [mode args] [extra ros2 launch args...]
 bluebot_bringup.sh status
 bluebot_bringup.sh list-modes
@@ -24,15 +24,17 @@ bluebot_bringup.sh modes
 bluebot_bringup.sh save-map [name]
 ```
 
+`observability` runs as a sidecar and can be active at the same time as one primary mode (for example `mapping` or `navigation`).
+
 ## Modes and Mode Args
 
 | Mode | Required mode args | Launch target | Built-in launch args |
 | --- | --- | --- | --- |
 | `sensors` | none | `robot_bringup sensors.launch.py` | `use_sim_time:=$USE_SIM_TIME` |
 | `apriltag` | none | `robot_bringup apriltag_realsense.launch.py` | `use_sim_time:=$USE_SIM_TIME` |
-| `mapping` | none | `robot_bringup mapping.launch.py` | `use_sim_time:=$USE_SIM_TIME` `apriltag_realsense_enabled:=$APRILTAG_REALSENSE_ENABLED` `apriltag_map_recorder_enabled:=$APRILTAG_MAP_RECORDER_ENABLED` `apriltag_map_output_yaml:=$APRILTAG_MAP_OUTPUT_YAML` |
+| `mapping` | none | `robot_bringup mapping.launch.py` | `use_sim_time:=$USE_SIM_TIME` `apriltag_realsense_enabled:=${MAPPING_APRILTAG_REALSENSE_ENABLED:-${APRILTAG_REALSENSE_ENABLED:-true}}` `apriltag_map_recorder_enabled:=$APRILTAG_MAP_RECORDER_ENABLED` `apriltag_map_output_yaml:=$APRILTAG_MAP_OUTPUT_YAML` |
 | `nav2` | `<map>` | `robot_bringup nav2.launch.py` | `map:=<resolved map yaml>` `use_sim_time:=$USE_SIM_TIME` |
-| `navigation` | `<map>` | `robot_bringup navigation.launch.py` | `map:=<resolved map yaml>` `use_sim_time:=$USE_SIM_TIME` `apriltag_realsense_enabled:=$APRILTAG_REALSENSE_ENABLED` `apriltag_behavior_enabled:=$APRILTAG_BEHAVIOR_ENABLED` |
+| `navigation` | `<map>` | `robot_bringup navigation.launch.py` | `map:=<resolved map yaml>` `use_sim_time:=$USE_SIM_TIME` `apriltag_realsense_enabled:=${NAVIGATION_APRILTAG_REALSENSE_ENABLED:-${APRILTAG_REALSENSE_ENABLED:-false}}` `apriltag_behavior_enabled:=$APRILTAG_BEHAVIOR_ENABLED` |
 | `localization` | none | `robot_bringup localization.launch.py` | `use_sim_time:=$USE_SIM_TIME` |
 | `health` | none | `robot_bringup health.launch.py` | `use_sim_time:=$USE_SIM_TIME` |
 | `observability` | none | `robot_bringup observability.launch.py` | `use_sim_time:=$USE_SIM_TIME` |
@@ -60,7 +62,7 @@ For `start` and `restart`, any trailing arguments are appended unchanged to `ros
 Examples:
 
 ```bash
-"$ROS_WS/scripts/bluebot_bringup.sh" start mapping apriltag_realsense_enabled:=true
+"$ROS_WS/scripts/bluebot_bringup.sh" start mapping apriltag_realsense_enabled:=false
 "$ROS_WS/scripts/bluebot_bringup.sh" start navigation office_a apriltag_behavior_enabled:=false
 "$ROS_WS/scripts/bluebot_bringup.sh" restart sensors log_level:=debug
 ```
@@ -94,6 +96,9 @@ The script uses these files:
 - `/tmp/bluebot_bringup.mode`
 - `/tmp/bluebot_bringup.cmd`
 - `/tmp/bluebot_bringup.log`
+- `/tmp/bluebot_bringup.observability.pid`
+- `/tmp/bluebot_bringup.observability.cmd`
+- `/tmp/bluebot_bringup.observability.log`
 
 What they are used for:
 
@@ -110,8 +115,10 @@ What they are used for:
 | `MAP_DIR` | `/ssd/maps` | Map lookup and save destination |
 | `SHUTDOWN_TIMEOUT_SEC` | `10` | Graceful stop wait window before forced kill |
 | `USE_SIM_TIME` | `false` | Passed to most launch modes |
-| `APRILTAG_REALSENSE_ENABLED` | `false` | Mapping/navigation launch arg |
-| `APRILTAG_MAP_RECORDER_ENABLED` | `false` | Mapping launch arg |
+| `APRILTAG_REALSENSE_ENABLED` | unset | Shared AprilTag camera override used by mapping/navigation when mode-specific vars are unset |
+| `MAPPING_APRILTAG_REALSENSE_ENABLED` | `true` | Mapping launch arg default for `apriltag_realsense_enabled` |
+| `NAVIGATION_APRILTAG_REALSENSE_ENABLED` | `false` | Navigation launch arg default for `apriltag_realsense_enabled` |
+| `APRILTAG_MAP_RECORDER_ENABLED` | `true` | Mapping launch arg |
 | `APRILTAG_MAP_OUTPUT_YAML` | `/tmp/apriltag_map_landmarks.yaml` | Mapping recorder output path |
 | `APRILTAG_BEHAVIOR_ENABLED` | `true` | Navigation launch arg |
 | `MAP_SAVE_TIMEOUT_SEC` | `15.0` | `map_saver_cli` timeout parameter |
@@ -158,8 +165,6 @@ What they are used for:
 Start mapping with recorder on:
 
 ```bash
-APRILTAG_REALSENSE_ENABLED=true \
-APRILTAG_MAP_RECORDER_ENABLED=true \
 "$ROS_WS/scripts/bluebot_bringup.sh" start mapping
 ```
 
@@ -180,5 +185,5 @@ Inspect and stop:
 ```bash
 "$ROS_WS/scripts/bluebot_bringup.sh" status
 "$ROS_WS/scripts/bluebot_bringup.sh" stop
+"$ROS_WS/scripts/bluebot_bringup.sh" stop observability
 ```
-

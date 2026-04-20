@@ -7,6 +7,7 @@ BLUEBOT_SCRIPT="${BLUEBOT_SCRIPT:-$ROS_WS/scripts/bluebot.sh}"
 RVIZ_START_SCRIPT="${RVIZ_START_SCRIPT:-$ROS_WS/rviz/start-rviz}"
 RVIZ_CONFIG="${RVIZ_CONFIG:-$ROS_WS/rviz/my_house_nav.rviz}"
 FOXGLOVE_LAYOUT="${FOXGLOVE_LAYOUT:-$ROS_WS/foxglove/bluebot_nav_layout.json}"
+FOXGLOVE_BT_LAYOUT="${FOXGLOVE_BT_LAYOUT:-$ROS_WS/foxglove/bluebot_nav_bt_layout.json}"
 FOXGLOVE_EXTENSION_DIR="${FOXGLOVE_EXTENSION_DIR:-$ROS_WS/foxglove/bluebot_nav2_extension}"
 
 MAP_DIR="${MAP_DIR:-/ssd/maps}"
@@ -34,6 +35,7 @@ usage() {
   echo "Environment:"
   echo "  NAV_UI=foxglove|rviz|none (default: foxglove)"
   echo "  FOXGLOVE_LAYOUT=$FOXGLOVE_LAYOUT"
+  echo "  FOXGLOVE_BT_LAYOUT=$FOXGLOVE_BT_LAYOUT"
   echo "  FOXGLOVE_EXTENSION_DIR=$FOXGLOVE_EXTENSION_DIR"
 }
 
@@ -206,6 +208,11 @@ show_foxglove_info() {
     echo "Foxglove nav layout: $FOXGLOVE_LAYOUT"
   else
     echo "Foxglove nav layout not found: $FOXGLOVE_LAYOUT"
+  fi
+  if [[ -f "$FOXGLOVE_BT_LAYOUT" ]]; then
+    echo "Foxglove BT layout: $FOXGLOVE_BT_LAYOUT"
+  else
+    echo "Foxglove BT layout not found: $FOXGLOVE_BT_LAYOUT"
   fi
   if [[ -d "$FOXGLOVE_EXTENSION_DIR" ]]; then
     echo "Foxglove Nav2 extension: $FOXGLOVE_EXTENSION_DIR"

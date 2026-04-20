@@ -20,12 +20,14 @@ This package provides launch/config for:
   - `apriltag_map_recorder`
   - `apriltag_landmark_tf_publisher`
   - `apriltag_map_localization`
+  - `dock_command`
+  - `dock_detector`
 
 ## Directory Layout
 
 - `launch/`: entrypoints (`sensors`, `mapping`, `nav2`, `navigation`, `apriltag_realsense`, `localization`, `health`, `observability`)
 - `config/`: dedicated YAML config per stack/component
-- `robot_bringup/`: Python nodes (`health_monitor`, `apriltag_nav_behavior_tree`, `apriltag_map_recorder`, `apriltag_landmark_tf_publisher`, `apriltag_map_localization`)
+- `robot_bringup/`: Python nodes (`health_monitor`, `apriltag_nav_behavior_tree`, `apriltag_map_recorder`, `apriltag_landmark_tf_publisher`, `apriltag_map_localization`, `dock_command_node`, `dock_detector_node`)
 
 ## Build
 
@@ -105,6 +107,18 @@ Foxglove layouts for `robot_bringup`:
       - goal pose: `/goal_pose`
       - initial pose: `/initialpose`
 
+- Navigation BT monitor template (standalone dashboard):
+  - `/ssd/ros2_ws/foxglove/bluebot_nav_bt_layout.json`
+  - Tabs:
+    - `BT Realtime`:
+      - `/behavior_tree_log`
+      - `/navigate_to_pose/_action/status`
+      - `/navigate_through_poses/_action/status`
+      - `/dock_robot/_action/status`
+      - `/rosout`
+    - `BT + Nav Context`:
+      - 3D Nav view plus `/behavior_tree_log` and `/diagnostics`
+
 ## Common Workflows
 
 ### Mapping (with optional AprilTag landmark recording)
@@ -121,6 +135,12 @@ AprilTag recorder requirements:
 - `apriltag_map_recorder_enabled:=true`
 - a valid TF chain from `map` to camera optical frame (for example `camera_color_optical_frame`)
 - sufficient observations (`min_observations` in `config/apriltag_map_recorder.yaml`, default `5`)
+
+When tags become registered, the recorder publishes map-anchored landmarks live as:
+- `/apriltag/landmarks` (`geometry_msgs/PoseArray` in `map`)
+- TF frames: `map -> apriltag_landmark/<family>_<id>`
+
+Note: `/tag_detections` remains camera-relative by design (raw observations).
 
 Recommended mapping capture pattern (best landmark quality):
 - stop-and-scan at each tag (robot stationary before sampling)
@@ -263,6 +283,7 @@ ros2 topic echo /localization_result --once
 
 Notes:
 - `apriltag_nav_behavior_tree` may log QoS incompatibility warnings on `/initialpose`; this does not block AMCL initialization.
+- `isaac_to_nav2_pose` also mirrors localization updates to `/set_pose` so `robot_localization_global_filter` can snap to the localized map pose (not just slowly fuse it as `pose1`).
 - Occupancy localizer only emits on trigger. Trigger one global-search pass with:
 
 ```bash
@@ -275,6 +296,28 @@ ros2 service call /trigger_grid_search_localization std_srvs/srv/Empty {}
 ros2 launch robot_bringup navigation.launch.py \
   map:=/ssd/maps/office_a.yaml \
   occupancy_grid_localizer_enabled:=false
+```
+
+### Planner repeats `Could not transform the start or goal pose in the costmap frame`
+
+If logs show errors like:
+
+- `transformPoseInTargetFrame: Extrapolation Error ... from frame [base_link] to frame [map]`
+- `Requested time ... earliest data is ...`
+
+that means a goal was sent in a robot-relative frame (for example `base_link`) with an old timestamp, so Nav2 eventually cannot transform it once TF cache advances.
+
+`nav2.launch.py` now starts `goal_pose_sanitizer`, which:
+
+- subscribes to `/goal_pose`
+- rewrites goals into `map` frame with a fresh stamp on `/goal_pose_sanitized`
+- remaps Nav2’s goal subscription to `/goal_pose_sanitized`
+
+Quick checks:
+
+```bash
+ros2 node info /goal_pose_sanitizer
+ros2 node info /bt_navigator | rg goal_pose
 ```
 
 ## Drift Management
@@ -318,7 +361,7 @@ Important launch args:
 - `apriltag_behavior_rules_file` (default `config/apriltag_nav_rules.yaml`)
 - `apriltag_landmarks_file` (default empty)
 - `map` (required for normal navigation)
-- `docking_params_file` (default `config/docking_server.yaml`)
+- `docking_params_file` (default `config/docking_server.yaml`, used by `opennav_docking`)
 
 ### How `rules_file`, `landmarks_file`, and `map_yaml` are passed
 
@@ -344,6 +387,7 @@ If `landmarks_file` is left empty and `auto_landmarks_from_map: true`, the node 
 | `navigate_to_pose` | Send Nav2 goal | `frame_id`, `x`, `y`, `yaw_deg`, `cancel_active_goal` |
 | `set_initial_pose` | Publish localization pose correction | `frame_id`, `x`, `y`, `yaw_deg`, `covariance_xy`, `covariance_yaw`, `use_landmark_pose` |
 | `dock_then_sleep` | Reverse dock, optional Nav2 pause, LiDAR motor stop/start during sleep, resume | `linear_x`, `angular_z`, `dock_target_range_m`, `dock_timeout_sec`, `sleep_duration_sec`, `pause_nav2_during_sleep` |
+| `dock_relocalize_spin_resume` | Stop nav, approach tag to target range, retrigger localization, wait, back away, spin, resume nav lifecycle | `linear_x`, `angular_z`, `dock_target_range_m`, `dock_timeout_sec`, `relocalize_wait_sec`, `backaway_linear_x`, `backaway_duration_sec`, `spin_angular_z`, `spin_angle_deg`, `pause_nav2_during_sleep` |
 
 General rule fields:
 - `name`
@@ -355,22 +399,62 @@ General rule fields:
 - `once`
 - `min_range_m` / `max_range_m`
 
-Current rules file already includes:
-- docking on tags `25` and `26`
-- relocalization on tags `6`, `9`, `11`, `12` via `set_initial_pose` + `use_landmark_pose: true`
+Current default rules file includes:
+- relocalization on tags `2`, `3`, `9`, and `20` via `set_initial_pose` + `use_landmark_pose: true`
+- stop / cancel-navigation example actions
 
-### Docking tuning
+`auto_relocalize_on_landmarks: true` (default in `config/apriltag_nav_behavior.yaml`) automatically generates a `set_initial_pose` rule for every landmark in the loaded `.apriltags.yaml` that is not already covered by an explicit rule. Tune via:
+- `auto_relocalize_max_range_m` (default `2.0`) — only fire within this range
+- `auto_relocalize_cooldown_sec` (default `20.0`) — minimum seconds between relocalization triggers per tag
+- `auto_relocalize_priority` (default `50`) — lower than explicit rules (180) so hand-crafted rules always win
+- `auto_relocalize_covariance_xy` / `auto_relocalize_covariance_yaw` — pose uncertainty injected into AMCL
 
-`config/docking_server.yaml` controls defaults used by `dock_then_sleep`, including:
-- `docking_default_linear_x` (negative = reverse docking)
-- `docking_default_target_range_m`
-- `docking_default_timeout_sec`
-- `docking_sleep_duration_sec`
-- `docking_pause_nav2`
-- `docking_lidar_power_control_enabled`
-- `lidar_stop_motor_service`
-- `lidar_start_motor_service`
-- `lifecycle_manager_service`
+### Docking
+
+`navigation.launch.py` starts `opennav_docking` as `docking_server`, `dock_command_node`
+as a topic-driven trigger, and `dock_detector_node` as the dock perception bridge.
+
+`config/docking_server.yaml` is loaded via `docking_params_file` and controls dock plugins,
+dock database path, and controller tuning for Open Navigation docking.
+
+#### dock_detector_node
+
+`dock_detector_node` bridges AprilTag detections to the docking server's external perception
+interface. It subscribes to `/tag_detections`, filters for known dock tag IDs, and publishes
+the tag's camera-frame pose as `geometry_msgs/PoseStamped` to `/detected_dock_pose`.
+
+The docking server (`SimpleChargingDock` with `use_external_detection_pose: true`) consumes
+`/detected_dock_pose` during INITIAL_PERCEPTION and CONTROLLING phases. The dock tag IDs
+should match the `id` fields in `docks_db/dock_database.yaml`.
+
+`dock_detector_node` parameters (all have defaults):
+- `detections_topic` (default `/tag_detections`)
+- `detected_dock_pose_topic` (default `/detected_dock_pose`)
+- `dock_tag_ids` (default `[9, 25]`)
+- `dock_tag_family` (default `tag36h11`)
+
+The node is only launched when `apriltag_realsense_enabled` is `true`.
+
+#### dock_command_node
+
+To send a dock command by dock ID (triggers full navigate-to-staging + dock):
+
+```bash
+ros2 topic pub --once /dock_command std_msgs/String "data: '25'"
+```
+
+To dock without re-navigating to staging (robot already staged):
+
+```bash
+ros2 action send_goal /dock_robot opennav_docking_msgs/action/DockRobot \
+  "{use_dock_id: true, dock_id: 'dock25', navigate_to_staging_pose: false}"
+```
+
+`dock_command_node` parameters (all have defaults, no config file required):
+- `dock_command_topic` (default `/dock_command`)
+- `dock_action_server` (default `dock_robot`)
+- `navigate_to_staging_pose` (default `true`)
+- `max_staging_time` (default `120.0`)
 
 ## Diagnostics and Health
 

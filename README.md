@@ -130,6 +130,9 @@ ros2 launch robot_bringup mapping.launch.py \
   apriltag_map_output_yaml:=/tmp/apriltag_map_landmarks.yaml
 ```
 
+During mapping, registered landmarks are published in `map` on `/apriltag/landmarks`
+and as TF `map -> apriltag_landmark/*`. Raw `/tag_detections` remains camera-relative.
+
 Best-practice capture during mapping:
 
 - Stop-and-scan per tag (stationary robot before sampling).

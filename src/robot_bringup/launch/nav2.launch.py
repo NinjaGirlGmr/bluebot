@@ -3,7 +3,7 @@ from launch.actions import DeclareLaunchArgument, GroupAction, IncludeLaunchDesc
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
-from launch_ros.actions import Node, SetParameter, SetParametersFromFile
+from launch_ros.actions import Node, SetParameter, SetParametersFromFile, SetRemap
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
@@ -30,6 +30,9 @@ def generate_launch_description():
 
     health_monitor_enabled = LaunchConfiguration('health_monitor_enabled')
     health_params_file = LaunchConfiguration('health_params_file')
+    goal_pose_input_topic = LaunchConfiguration('goal_pose_input_topic')
+    goal_pose_output_topic = LaunchConfiguration('goal_pose_output_topic')
+    goal_pose_target_frame = LaunchConfiguration('goal_pose_target_frame')
 
     drive_stack_enabled = LaunchConfiguration('drive_stack_enabled')
     serial_bridge_params_file = LaunchConfiguration('serial_bridge_params_file')
@@ -66,6 +69,9 @@ def generate_launch_description():
     )
     state_estimation_global_odom_topic = LaunchConfiguration(
         'state_estimation_global_odom_topic'
+    )
+    state_estimation_global_set_pose_topic = LaunchConfiguration(
+        'state_estimation_global_set_pose_topic'
     )
     state_estimation_base_frame = LaunchConfiguration('state_estimation_base_frame')
     state_estimation_imu_frame = LaunchConfiguration('state_estimation_imu_frame')
@@ -181,7 +187,10 @@ def generate_launch_description():
                 'pose1': state_estimation_global_initialpose_topic,
             },
         ],
-        remappings=[('/odometry/filtered', state_estimation_global_odom_topic)],
+        remappings=[
+            ('/odometry/filtered', state_estimation_global_odom_topic),
+            ('/set_pose', state_estimation_global_set_pose_topic),
+        ],
     )
 
     straight_line_compensator = Node(
@@ -219,8 +228,24 @@ def generate_launch_description():
         ],
     )
 
+    goal_pose_sanitizer = Node(
+        package='robot_bringup',
+        executable='goal_pose_sanitizer',
+        name='goal_pose_sanitizer',
+        output='screen',
+        parameters=[
+            {
+                'use_sim_time': ParameterValue(use_sim_time, value_type=bool),
+                'input_topic': goal_pose_input_topic,
+                'output_topic': goal_pose_output_topic,
+                'target_frame': goal_pose_target_frame,
+            }
+        ],
+    )
+
     nav2_bringup = GroupAction(
         actions=[
+            SetRemap(src='/goal_pose', dst=goal_pose_output_topic),
             SetParametersFromFile(smoother_params_file),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
@@ -287,9 +312,9 @@ def generate_launch_description():
         DeclareLaunchArgument('serial_odom_topic', default_value='/odom_raw'),
         DeclareLaunchArgument('serial_publish_tf', default_value='false'),
         DeclareLaunchArgument('serial_enable_stall_compensation', default_value='true'),
-        DeclareLaunchArgument('serial_min_effective_linear_mps', default_value='0.14'),
-        DeclareLaunchArgument('serial_min_effective_angular_rad_s', default_value='0.25'),
-        DeclareLaunchArgument('serial_min_effective_turn_wheel_mps', default_value='0.10'),
+        DeclareLaunchArgument('serial_min_effective_linear_mps', default_value='0.28'),
+        DeclareLaunchArgument('serial_min_effective_angular_rad_s', default_value='0.22'),
+        DeclareLaunchArgument('serial_min_effective_turn_wheel_mps', default_value='0.18'),
         DeclareLaunchArgument('serial_zero_cmd_epsilon', default_value='0.0001'),
         DeclareLaunchArgument(
             'state_estimation_params_file',
@@ -322,6 +347,10 @@ def generate_launch_description():
             'state_estimation_global_odom_topic',
             default_value='/odometry/global',
         ),
+        DeclareLaunchArgument(
+            'state_estimation_global_set_pose_topic',
+            default_value='/set_pose_global',
+        ),
         DeclareLaunchArgument('state_estimation_base_frame', default_value='base_link'),
         DeclareLaunchArgument('state_estimation_imu_frame', default_value='imu_link'),
         DeclareLaunchArgument(
@@ -346,6 +375,9 @@ def generate_launch_description():
         DeclareLaunchArgument('udp_cmd_vel_topic', default_value='/cmd_vel'),
         DeclareLaunchArgument('udp_timeout_s', default_value='0.5'),
         DeclareLaunchArgument('health_monitor_enabled', default_value='true'),
+        DeclareLaunchArgument('goal_pose_input_topic', default_value='/goal_pose'),
+        DeclareLaunchArgument('goal_pose_output_topic', default_value='/goal_pose_sanitized'),
+        DeclareLaunchArgument('goal_pose_target_frame', default_value='map'),
         DeclareLaunchArgument(
             'health_params_file',
             default_value=PathJoinSubstitution(
@@ -360,6 +392,7 @@ def generate_launch_description():
         state_estimation_global,
         straight_line_compensator,
         udp_cmd_vel_bridge,
+        goal_pose_sanitizer,
         nav2_bringup,
         health_monitor,
     ])

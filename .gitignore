@@ -13,6 +13,7 @@ start_stack.sh
 scripts/*
 !scripts/bluebot.sh
 !scripts/bluebot_nav.sh
+!scripts/enable_ros2_control_realtime.sh
 !scripts/*.md
 !scripts/wifi_mode_switch.py
 !scripts/wifi_mode_switch.service

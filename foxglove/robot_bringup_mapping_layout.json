@@ -123,6 +123,9 @@
                             ]
                           },
                           "/tag_detections": {
+                            "visible": false
+                          },
+                          "/apriltag/landmarks": {
                             "visible": true
                           },
                           "/initialpose": {
@@ -243,6 +246,9 @@
                             "visible": true
                           },
                           "/tag_detections": {
+                            "visible": true
+                          },
+                          "/apriltag/landmarks": {
                             "visible": true
                           }
                         },

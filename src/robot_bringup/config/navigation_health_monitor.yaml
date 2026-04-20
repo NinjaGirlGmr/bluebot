@@ -56,4 +56,6 @@ health_monitor:
       - velocity_smoother
       - lifecycle_manager_localization
       - lifecycle_manager_navigation
+      - lifecycle_manager_docking
+      - docking_server
       - apriltag_nav_behavior_tree

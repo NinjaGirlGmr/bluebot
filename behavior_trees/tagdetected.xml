@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root BTCPP_format="4" main_tree_to_execute="MainTree">
+
+  <BehaviorTree ID="MainTree">
+    <ReactiveFallback name="MainDecision">
+
+      <!-- 1. AprilTag has highest priority -->
+      <Sequence name="AprilTagBranch">
+        <IsAprilTagDetected tag_id="{target_tag}"/>
+        <CancelControl name="CancelControllerForTag"/>
+        <StopMotion name="StopForTag"/>
+        <ApproachTag tag_id="{target_tag}" approach_distance="0.50"/>
+        <PerformTagTask tag_id="{target_tag}"/>
+      </Sequence>
+
+      <!-- 2. Relocalize if localization is unhealthy -->
+      <Sequence name="RelocalizeBranch">
+        <IsLocalizationLost/>
+        <CancelControl name="CancelControllerForRelocalize"/>
+        <StopMotion name="StopForRelocalize"/>
+        <ClearEntireCostmap name="ClearLocalCostmap"
+                            service_name="local_costmap/clear_entirely_local_costmap"/>
+        <CallLocalizationService service_name="/reinitialize_global_localization"/>
+        <WaitForLocalization timeout="5.0"/>
+      </Sequence>
+
+      <!-- 3. Otherwise, do normal Nav2 navigation -->
+      <PipelineSequence name="NavigationBranch">
+        <RateController hz="1.0">
+          <ComputePathToPose goal="{goal}" path="{path}" planner_id="{selected_planner}"/>
+        </RateController>
+        <FollowPath path="{path}" controller_id="{selected_controller}"/>
+      </PipelineSequence>
+
+    </ReactiveFallback>
+  </BehaviorTree>
+
+  <!-- Optional node models for Groot -->
+  <TreeNodesModel>
+
+    <Condition ID="IsAprilTagDetected">
+      <input_port name="tag_id" type="int"/>
+    </Condition>
+
+    <Action ID="StopMotion"/>
+
+    <Action ID="ApproachTag">
+      <input_port name="tag_id" type="int"/>
+      <input_port name="approach_distance" type="double"/>
+    </Action>
+
+    <Action ID="PerformTagTask">
+      <input_port name="tag_id" type="int"/>
+    </Action>
+
+    <Condition ID="IsLocalizationLost"/>
+
+    <Action ID="CallLocalizationService">
+      <input_port name="service_name" type="std::string"/>
+    </Action>
+
+    <Condition ID="WaitForLocalization">
+      <input_port name="timeout" type="double"/>
+    </Condition>
+
+    <Action ID="CancelControl"/>
+    <Action ID="StopMotion"/>
+
+  </TreeNodesModel>
+</root>

@@ -2,7 +2,8 @@ apriltag_landmark_tf_publisher:
   ros__parameters:
     use_sim_time: false
     map_frame: map
-    landmarks_file: ""
-    map_yaml: ""
     auto_landmarks_from_map: true
     child_frame_prefix: apriltag_landmark
+    publish_landmarks_topic: true
+    landmarks_topic: /apriltag/landmarks
+    landmarks_publish_period_sec: 1.0

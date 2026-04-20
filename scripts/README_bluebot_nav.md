@@ -47,6 +47,19 @@ ws://<robot-ip>:8765
 /ssd/ros2_ws/foxglove/bluebot_nav_layout.json
 ```
 
+Optional BT-focused dashboard (separate import):
+
+```text
+/ssd/ros2_ws/foxglove/bluebot_nav_bt_layout.json
+```
+
+This dashboard is focused on Nav2 behavior tree and status introspection:
+- `/behavior_tree_log`
+- `/navigate_to_pose/_action/status`
+- `/navigate_through_poses/_action/status`
+- `/dock_robot/_action/status`
+- `/rosout`
+
 4. In a `3D` panel, click `Publish`, choose `Pose`, and place a goal on the map.
    - Goal topic: `/goal_pose`
    - Pose estimate topic (if needed): `/initialpose`
@@ -109,6 +122,7 @@ Send selected waypoints only:
 - `MAP_DIR` (default `/ssd/maps`)
 - `BLUEBOT_SCRIPT` (default `/ssd/ros2_ws/scripts/bluebot.sh`)
 - `FOXGLOVE_LAYOUT` (default `/ssd/ros2_ws/foxglove/bluebot_nav_layout.json`)
+- `FOXGLOVE_BT_LAYOUT` (default `/ssd/ros2_ws/foxglove/bluebot_nav_bt_layout.json`)
 - `FOXGLOVE_EXTENSION_DIR` (default `/ssd/ros2_ws/foxglove/bluebot_nav2_extension`)
 - `FOXGLOVE_BRIDGE_PORT` (default `8765`)
 - `FOXGLOVE_WAYPOINT_TOPIC` (default `/foxglove/waypoints`)

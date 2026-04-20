@@ -239,3 +239,5 @@ FOXGLOVE_WAYPOINT_TOPIC=/my_waypoints /ssd/ros2_ws/scripts/bluebot.sh restart-na
 - `Waypoint file not found`: run `capture-waypoint` first.
 - `Stack appears to already be running`: run `/ssd/ros2_ws/scripts/bluebot.sh stop` before starting a different mode.
 - `controller_server Failed to make progress` repeats: run `/ssd/ros2_ws/scripts/bluebot.sh nav-health` and check `progress_fail`, `collision_ahead`, and `control_missed` counters.
+- `controller_manager Could not enable FIFO RT scheduling policy`: run `sudo /ssd/ros2_ws/scripts/enable_ros2_control_realtime.sh "$USER"` once, then log out and back in.
+- `spawner_joint_state_broadcaster Could not contact service /controller_manager/list_controllers`: `ros2_control_node` likely failed to start. If you see `libbackward.so` loader errors, rerun `sudo /ssd/ros2_ws/scripts/enable_ros2_control_realtime.sh "$USER"` (it now refreshes `ldconfig` for `/opt/ros/humble/lib`) and restart nav.

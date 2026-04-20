@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 
+import os
+
+from ament_index_python.packages import PackageNotFoundError, get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, GroupAction, IncludeLaunchDescription, TimerAction
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
@@ -12,6 +15,16 @@ from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description() -> LaunchDescription:
     use_sim_time = LaunchConfiguration('use_sim_time')
+    try:
+        docking_server_params_dir = os.path.join(
+            get_package_share_directory('docking_server'),
+            'params',
+        )
+    except PackageNotFoundError:
+        docking_server_params_dir = os.path.join(
+            get_package_share_directory('robot_bringup'),
+            'config',
+        )
 
     sensors_enabled = LaunchConfiguration('sensors_enabled')
     lidar_params_file = LaunchConfiguration('lidar_params_file')
@@ -79,6 +92,7 @@ def generate_launch_description() -> LaunchDescription:
     health_params_file = LaunchConfiguration('health_params_file')
 
     apriltag_realsense_enabled = LaunchConfiguration('apriltag_realsense_enabled')
+    apriltag_realsense_startup_delay_sec = LaunchConfiguration('apriltag_realsense_startup_delay_sec')
     apriltag_behavior_enabled = LaunchConfiguration('apriltag_behavior_enabled')
     apriltag_behavior_params_file = LaunchConfiguration('apriltag_behavior_params_file')
     apriltag_behavior_rules_file = LaunchConfiguration('apriltag_behavior_rules_file')
@@ -92,8 +106,12 @@ def generate_launch_description() -> LaunchDescription:
     docking_params_file = LaunchConfiguration('docking_params_file')
     grid_localization_enabled = LaunchConfiguration('grid_localization_enabled')
     grid_localization_scan_topic = LaunchConfiguration('grid_localization_scan_topic')
+    grid_localization_result_topic = LaunchConfiguration('grid_localization_result_topic')
     grid_localization_output_topic = LaunchConfiguration('grid_localization_output_topic')
     grid_localization_output_frame = LaunchConfiguration('grid_localization_output_frame')
+    grid_localization_use_current_output_stamp = LaunchConfiguration(
+        'grid_localization_use_current_output_stamp'
+    )
     grid_localization_fallback_enabled = LaunchConfiguration('grid_localization_fallback_enabled')
     grid_localization_fallback_wait_sec = LaunchConfiguration('grid_localization_fallback_wait_sec')
     grid_localization_fallback_publish_count = LaunchConfiguration(
@@ -107,6 +125,27 @@ def generate_launch_description() -> LaunchDescription:
     grid_localization_fallback_yaw = LaunchConfiguration('grid_localization_fallback_yaw')
     occupancy_grid_localizer_enabled = LaunchConfiguration(
         'occupancy_grid_localizer_enabled'
+    )
+    grid_localization_trigger_enabled = LaunchConfiguration(
+        'grid_localization_trigger_enabled'
+    )
+    grid_localization_trigger_service = LaunchConfiguration(
+        'grid_localization_trigger_service'
+    )
+    grid_localization_trigger_delay_sec = LaunchConfiguration(
+        'grid_localization_trigger_delay_sec'
+    )
+    grid_localization_trigger_retries = LaunchConfiguration(
+        'grid_localization_trigger_retries'
+    )
+    grid_localization_trigger_retry_interval_sec = LaunchConfiguration(
+        'grid_localization_trigger_retry_interval_sec'
+    )
+    grid_localization_trigger_service_ready_timeout_sec = LaunchConfiguration(
+        'grid_localization_trigger_service_ready_timeout_sec'
+    )
+    grid_localization_trigger_service_call_timeout_sec = LaunchConfiguration(
+        'grid_localization_trigger_service_call_timeout_sec'
     )
 
     set_use_sim_time = SetParameter(
@@ -131,17 +170,22 @@ def generate_launch_description() -> LaunchDescription:
         }.items(),
     )
 
-    apriltag_realsense = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            PathJoinSubstitution(
-                [FindPackageShare('robot_bringup'), 'launch', 'apriltag_realsense.launch.py']
+    apriltag_realsense = TimerAction(
+        period=apriltag_realsense_startup_delay_sec,
+        actions=[
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    PathJoinSubstitution(
+                        [FindPackageShare('robot_bringup'), 'launch', 'apriltag_realsense.launch.py']
+                    )
+                ),
+                condition=IfCondition(apriltag_realsense_enabled),
+                launch_arguments={
+                    'use_sim_time': use_sim_time,
+                    'health_monitor_enabled': 'false',
+                }.items(),
             )
-        ),
-        condition=IfCondition(apriltag_realsense_enabled),
-        launch_arguments={
-            'use_sim_time': use_sim_time,
-            'health_monitor_enabled': 'false',
-        }.items(),
+        ],
     )
 
     nav2_stack = IncludeLaunchDescription(
@@ -203,8 +247,8 @@ def generate_launch_description() -> LaunchDescription:
             apriltag_landmark_tf_params_file,
             {
                 'use_sim_time': ParameterValue(use_sim_time, value_type=bool),
-                'map_yaml': map_file,
-                'landmarks_file': apriltag_landmarks_file,
+                'map_yaml': ParameterValue(map_file, value_type=str),
+                'landmarks_file': ParameterValue(apriltag_landmarks_file, value_type=str),
             },
         ],
     )
@@ -219,8 +263,8 @@ def generate_launch_description() -> LaunchDescription:
             apriltag_map_localization_params_file,
             {
                 'use_sim_time': ParameterValue(use_sim_time, value_type=bool),
-                'map_yaml': map_file,
-                'landmarks_file': apriltag_landmarks_file,
+                'map_yaml': ParameterValue(map_file, value_type=str),
+                'landmarks_file': ParameterValue(apriltag_landmarks_file, value_type=str),
             },
         ],
     )
@@ -240,8 +284,10 @@ def generate_launch_description() -> LaunchDescription:
             'map_yaml_path': map_file,
             'use_sim_time': use_sim_time,
             'scan_topic': grid_localization_scan_topic,
+            'localization_result_topic': grid_localization_result_topic,
             'output_topic': grid_localization_output_topic,
             'output_frame_id': grid_localization_output_frame,
+            'use_current_output_stamp': grid_localization_use_current_output_stamp,
             'fallback_initial_pose_enabled': grid_localization_fallback_enabled,
             'fallback_initial_pose_wait_sec': grid_localization_fallback_wait_sec,
             'fallback_initial_pose_publish_count': grid_localization_fallback_publish_count,
@@ -255,6 +301,95 @@ def generate_launch_description() -> LaunchDescription:
         }.items(),
     )
 
+    grid_localization_trigger = Node(
+        package='robot_bringup',
+        executable='grid_localization_trigger',
+        name='grid_localization_trigger',
+        output='screen',
+        condition=IfCondition(grid_localization_trigger_enabled),
+        parameters=[
+            {
+                'use_sim_time': ParameterValue(use_sim_time, value_type=bool),
+                'service_name': ParameterValue(grid_localization_trigger_service, value_type=str),
+                'startup_delay_sec': ParameterValue(
+                    grid_localization_trigger_delay_sec,
+                    value_type=float,
+                ),
+                'retries': ParameterValue(grid_localization_trigger_retries, value_type=int),
+                'retry_interval_sec': ParameterValue(
+                    grid_localization_trigger_retry_interval_sec,
+                    value_type=float,
+                ),
+                'service_ready_timeout_sec': ParameterValue(
+                    grid_localization_trigger_service_ready_timeout_sec,
+                    value_type=float,
+                ),
+                'service_call_timeout_sec': ParameterValue(
+                    grid_localization_trigger_service_call_timeout_sec,
+                    value_type=float,
+                ),
+                'result_topic': ParameterValue(
+                    grid_localization_result_topic,
+                    value_type=str,
+                ),
+            }
+        ],
+    )
+
+    grid_localization_stack = GroupAction(
+        condition=IfCondition(grid_localization_enabled),
+        actions=[
+            grid_localization,
+            grid_localization_trigger,
+        ],
+    )
+
+    docking_server = Node(
+        package='opennav_docking',
+        executable='opennav_docking',
+        name='docking_server',
+        output='screen',
+        parameters=[
+            docking_params_file,
+            {'use_sim_time': ParameterValue(use_sim_time, value_type=bool)},
+        ],
+    )
+
+    docking_lifecycle_manager = Node(
+        package='nav2_lifecycle_manager',
+        executable='lifecycle_manager',
+        name='lifecycle_manager_docking',
+        output='screen',
+        parameters=[
+            {
+                'use_sim_time': ParameterValue(use_sim_time, value_type=bool),
+                'autostart': True,
+                'node_names': ['docking_server'],
+            }
+        ],
+    )
+
+    dock_command = Node(
+        package='robot_bringup',
+        executable='dock_command',
+        name='dock_command_node',
+        output='screen',
+        parameters=[
+            {'use_sim_time': ParameterValue(use_sim_time, value_type=bool)},
+        ],
+    )
+
+    dock_detector = Node(
+        package='robot_bringup',
+        executable='dock_detector',
+        name='dock_detector_node',
+        output='screen',
+        condition=IfCondition(apriltag_realsense_enabled),
+        parameters=[
+            {'use_sim_time': ParameterValue(use_sim_time, value_type=bool)},
+        ],
+    )
+
     apriltag_behavior_tree = Node(
         package='robot_bringup',
         executable='apriltag_nav_behavior_tree',
@@ -263,12 +398,11 @@ def generate_launch_description() -> LaunchDescription:
         condition=IfCondition(apriltag_behavior_enabled),
         parameters=[
             apriltag_behavior_params_file,
-            docking_params_file,
             {
                 'use_sim_time': ParameterValue(use_sim_time, value_type=bool),
-                'rules_file': apriltag_behavior_rules_file,
-                'map_yaml': map_file,
-                'landmarks_file': apriltag_landmarks_file,
+                'rules_file': ParameterValue(apriltag_behavior_rules_file, value_type=str),
+                'map_yaml': ParameterValue(map_file, value_type=str),
+                'landmarks_file': ParameterValue(apriltag_landmarks_file, value_type=str),
             },
         ],
     )
@@ -396,7 +530,8 @@ def generate_launch_description() -> LaunchDescription:
                 [FindPackageShare('robot_bringup'), 'config', 'navigation_health_monitor.yaml']
             ),
         ),
-        DeclareLaunchArgument('apriltag_realsense_enabled', default_value='false'),
+        DeclareLaunchArgument('apriltag_realsense_enabled', default_value='true'),
+        DeclareLaunchArgument('apriltag_realsense_startup_delay_sec', default_value='15.0'),
         DeclareLaunchArgument('apriltag_behavior_enabled', default_value='true'),
         DeclareLaunchArgument(
             'apriltag_behavior_params_file',
@@ -427,15 +562,18 @@ def generate_launch_description() -> LaunchDescription:
         ),
         DeclareLaunchArgument(
             'docking_params_file',
-            default_value=PathJoinSubstitution(
-                [FindPackageShare('robot_bringup'), 'config', 'docking_server.yaml']
-            ),
+            default_value=os.path.join(docking_server_params_dir, 'docking_server.yaml'),
         ),
         DeclareLaunchArgument('grid_localization_enabled', default_value='true'),
         DeclareLaunchArgument('grid_localization_scan_topic', default_value='/scan'),
+        DeclareLaunchArgument('grid_localization_result_topic', default_value='/localization_result'),
         DeclareLaunchArgument('grid_localization_output_topic', default_value='/initialpose'),
         DeclareLaunchArgument('grid_localization_output_frame', default_value='map'),
-        DeclareLaunchArgument('grid_localization_fallback_enabled', default_value='true'),
+        DeclareLaunchArgument(
+            'grid_localization_use_current_output_stamp',
+            default_value='false',
+        ),
+        DeclareLaunchArgument('grid_localization_fallback_enabled', default_value='false'),
         DeclareLaunchArgument('grid_localization_fallback_wait_sec', default_value='6.0'),
         DeclareLaunchArgument('grid_localization_fallback_publish_count', default_value='5'),
         DeclareLaunchArgument('grid_localization_fallback_publish_period_sec', default_value='0.5'),
@@ -443,12 +581,35 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument('grid_localization_fallback_y', default_value='0.0'),
         DeclareLaunchArgument('grid_localization_fallback_yaw', default_value='0.0'),
         DeclareLaunchArgument('occupancy_grid_localizer_enabled', default_value='true'),
+        DeclareLaunchArgument('grid_localization_trigger_enabled', default_value='true'),
+        DeclareLaunchArgument(
+            'grid_localization_trigger_service',
+            default_value='/trigger_grid_search_localization',
+        ),
+        DeclareLaunchArgument('grid_localization_trigger_delay_sec', default_value='2.5'),
+        DeclareLaunchArgument('grid_localization_trigger_retries', default_value='120'),
+        DeclareLaunchArgument(
+            'grid_localization_trigger_retry_interval_sec',
+            default_value='1.0',
+        ),
+        DeclareLaunchArgument(
+            'grid_localization_trigger_service_ready_timeout_sec',
+            default_value='90.0',
+        ),
+        DeclareLaunchArgument(
+            'grid_localization_trigger_service_call_timeout_sec',
+            default_value='3.0',
+        ),
         set_use_sim_time,
         sensors,
         apriltag_realsense,
         apriltag_landmark_tf,
         apriltag_map_localization,
         nav2_stack,
-        grid_localization,
+        docking_server,
+        docking_lifecycle_manager,
+        dock_command,
+        dock_detector,
+        grid_localization_stack,
         apriltag_behavior_tree,
     ])

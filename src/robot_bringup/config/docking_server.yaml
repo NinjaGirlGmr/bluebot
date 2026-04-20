@@ -1,12 +1,40 @@
-apriltag_nav_behavior_tree:
+docking_server:
   ros__parameters:
-    lifecycle_manager_service: /lifecycle_manager_navigation/manage_nodes
-    docking_default_timeout_sec: 12.0
-    docking_default_target_range_m: 0.30
-    docking_default_linear_x: -0.08
-    docking_default_angular_z: 0.0
-    docking_sleep_duration_sec: 15.0
-    docking_pause_nav2: true
-    docking_lidar_power_control_enabled: true
-    lidar_stop_motor_service: /stop_motor
-    lidar_start_motor_service: /start_motor
+    controller_frequency: 50.0
+    initial_perception_timeout: 5.0
+    wait_charge_timeout: 5.0
+    dock_approach_timeout: 30.0
+    undock_linear_tolerance: 0.05
+    undock_angular_tolerance: 0.1
+    max_retries: 3
+    base_frame: "base_link"
+    fixed_frame: "map"
+    dock_backwards: false
+    dock_prestaging_tolerance: 0.5
+
+    # Types of docks. Keys must match `type` values in dock_database.yaml.
+    dock_plugins: ['NonChargingDock']
+    NonChargingDock:
+      plugin: 'opennav_docking::SimpleChargingDock'
+      docking_threshold: 0.05
+      staging_x_offset: -0.7
+      use_external_detection_pose: true
+      use_battery_status: false
+      use_stall_detection: false
+
+      external_detection_timeout: 1.0
+      external_detection_translation_x: -0.18
+      external_detection_translation_y: 0.0
+      external_detection_rotation_roll: -1.57
+      external_detection_rotation_pitch: -1.57
+      external_detection_rotation_yaw: 0.0
+      filter_coef: 0.1
+
+    # Sep. file of dock instances so config file can be used in multiple locations
+    dock_database: /ssd/ros2_ws/docks_db/dock_database.yaml
+
+    controller:
+      k_phi: 3.0
+      k_delta: 2.0
+      v_linear_min: 0.15
+      v_linear_max: 0.15

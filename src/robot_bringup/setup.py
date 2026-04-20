@@ -44,6 +44,22 @@ setup(
                 'apriltag_map_localization = '
                 'robot_bringup.apriltag_map_localization_node:main'
             ),
+            (
+                'goal_pose_sanitizer = '
+                'robot_bringup.goal_pose_sanitizer_node:main'
+            ),
+            (
+                'grid_localization_trigger = '
+                'robot_bringup.grid_localization_trigger_node:main'
+            ),
+            (
+                'dock_command = '
+                'robot_bringup.dock_command_node:main'
+            ),
+            (
+                'dock_detector = '
+                'robot_bringup.dock_detector_node:main'
+            ),
         ],
     },
 )

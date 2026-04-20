@@ -23,3 +23,8 @@ apriltag_map_recorder:
     write_on_shutdown: true
     log_new_tags: true
     log_rejections: false
+    publish_landmarks_topic: true
+    landmarks_topic: /apriltag/landmarks
+    publish_landmark_tf: true
+    landmark_tf_child_frame_prefix: apriltag_landmark
+    landmark_publish_period_sec: 0.50

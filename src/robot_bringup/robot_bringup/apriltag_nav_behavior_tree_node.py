@@ -27,6 +27,13 @@ DOCK_STAGE_APPROACH = 'approach'
 DOCK_STAGE_PAUSE = 'pause'
 DOCK_STAGE_SLEEP = 'sleep'
 DOCK_STAGE_RESUME = 'resume'
+RELOCALIZE_STAGE_PAUSE = 'pause'
+RELOCALIZE_STAGE_APPROACH = 'approach'
+RELOCALIZE_STAGE_TRIGGER = 'trigger_localization'
+RELOCALIZE_STAGE_WAIT = 'wait_after_localization'
+RELOCALIZE_STAGE_BACKAWAY = 'backaway'
+RELOCALIZE_STAGE_SPIN = 'spin'
+RELOCALIZE_STAGE_RESUME = 'resume'
 
 
 class BTNode:
@@ -107,6 +114,11 @@ class TagRule:
     dock_target_range_m: float
     sleep_duration_sec: float
     pause_nav2_during_sleep: bool
+    relocalize_wait_sec: float
+    backaway_duration_sec: float
+    backaway_linear_x: float
+    spin_angle_deg: float
+    spin_angular_z: float
     message: str
 
 
@@ -132,6 +144,29 @@ class ActiveDockAction:
     resume_future: Optional[Future] = None
     lidar_stop_future: Optional[Future] = None
     lidar_start_future: Optional[Future] = None
+
+
+@dataclass
+class ActiveRelocalizeManeuver:
+    rule_key: str
+    linear_x: float
+    angular_z: float
+    deadline_ns: int
+    dock_target_range_m: float
+    relocalize_wait_ns: int
+    backaway_linear_x: float
+    backaway_duration_ns: int
+    spin_angular_z: float
+    spin_duration_ns: int
+    stage: str
+    resume_required: bool = False
+    final_status_success: bool = True
+    wait_end_ns: int = 0
+    backaway_end_ns: int = 0
+    spin_end_ns: int = 0
+    pause_future: Optional[Future] = None
+    resume_future: Optional[Future] = None
+    reinitialize_future: Optional[Future] = None
 
 
 @dataclass
@@ -175,10 +210,20 @@ class AprilTagNavBehaviorTreeNode(Node):
         self.declare_parameter('docking_lidar_power_control_enabled', True)
         self.declare_parameter('lidar_stop_motor_service', '/stop_motor')
         self.declare_parameter('lidar_start_motor_service', '/start_motor')
+        self.declare_parameter(
+            'reinitialize_localization_service',
+            '/reinitialize_global_localization',
+        )
         self.declare_parameter('landmarks_file', '')
         self.declare_parameter('map_yaml', '')
         self.declare_parameter('auto_landmarks_from_map', True)
         self.declare_parameter('use_landmark_yaw', True)
+        self.declare_parameter('auto_relocalize_on_landmarks', False)
+        self.declare_parameter('auto_relocalize_max_range_m', 2.0)
+        self.declare_parameter('auto_relocalize_covariance_xy', 0.25)
+        self.declare_parameter('auto_relocalize_covariance_yaw', 0.0685)
+        self.declare_parameter('auto_relocalize_cooldown_sec', 20.0)
+        self.declare_parameter('auto_relocalize_priority', 50)
 
         self._detections_topic = str(self.get_parameter('detections_topic').value)
         self._cmd_vel_topic = str(self.get_parameter('cmd_vel_topic').value)
@@ -220,12 +265,33 @@ class AprilTagNavBehaviorTreeNode(Node):
         self._lidar_start_motor_service = str(
             self.get_parameter('lidar_start_motor_service').value
         )
+        self._reinitialize_localization_service = str(
+            self.get_parameter('reinitialize_localization_service').value
+        )
         self._landmarks_file_param = str(self.get_parameter('landmarks_file').value)
         self._map_yaml = str(self.get_parameter('map_yaml').value)
         self._auto_landmarks_from_map = bool(
             self.get_parameter('auto_landmarks_from_map').value
         )
         self._use_landmark_yaw = bool(self.get_parameter('use_landmark_yaw').value)
+        self._auto_relocalize_on_landmarks = bool(
+            self.get_parameter('auto_relocalize_on_landmarks').value
+        )
+        self._auto_relocalize_max_range_m = float(
+            self.get_parameter('auto_relocalize_max_range_m').value
+        )
+        self._auto_relocalize_covariance_xy = float(
+            self.get_parameter('auto_relocalize_covariance_xy').value
+        )
+        self._auto_relocalize_covariance_yaw = float(
+            self.get_parameter('auto_relocalize_covariance_yaw').value
+        )
+        self._auto_relocalize_cooldown_sec = float(
+            self.get_parameter('auto_relocalize_cooldown_sec').value
+        )
+        self._auto_relocalize_priority = int(
+            self.get_parameter('auto_relocalize_priority').value
+        )
 
         if self._tick_rate_hz <= 0.0:
             self._tick_rate_hz = 5.0
@@ -257,10 +323,20 @@ class AprilTagNavBehaviorTreeNode(Node):
             self.get_logger().error(f'Failed to load rules file "{self._rules_file}": {exc}')
             self._rules = []
 
+        if self._auto_relocalize_on_landmarks:
+            auto_rules = self._generate_landmark_relocalize_rules()
+            if auto_rules:
+                self._rules.extend(auto_rules)
+                self._rules.sort(key=lambda r: r.priority, reverse=True)
+                self.get_logger().info(
+                    f'Auto-generated {len(auto_rules)} relocalize rule(s) from landmarks.'
+                )
+
         self._selected_rule: Optional[TagRule] = None
         self._selected_detection: Optional[DetectionSnapshot] = None
         self._active_twist: Optional[ActiveTwistAction] = None
         self._active_dock: Optional[ActiveDockAction] = None
+        self._active_relocalize_maneuver: Optional[ActiveRelocalizeManeuver] = None
 
         self._cmd_vel_pub = self.create_publisher(Twist, self._cmd_vel_topic, 10)
         self._initial_pose_pub = self.create_publisher(
@@ -299,6 +375,10 @@ class AprilTagNavBehaviorTreeNode(Node):
             Empty,
             self._lidar_start_motor_service,
         )
+        self._reinitialize_localization_client = self.create_client(
+            Empty,
+            self._reinitialize_localization_service,
+        )
 
         self._tree = SelectorNode(
             [
@@ -323,6 +403,34 @@ class AprilTagNavBehaviorTreeNode(Node):
             f'lidar_stop_service="{self._lidar_stop_motor_service}", '
             f'lidar_start_service="{self._lidar_start_motor_service}"'
         )
+
+    def _generate_landmark_relocalize_rules(self) -> List[TagRule]:
+        explicit_tag_ids = {r.tag_id for r in self._rules}
+        auto_rules: List[TagRule] = []
+        for (family, tag_id), _landmark in self._landmarks_by_family_id.items():
+            if tag_id in explicit_tag_ids:
+                continue
+            raw = {
+                'name': f'auto_relocalize_{family}_{tag_id}',
+                'tag_id': tag_id,
+                'tag_family': family,
+                'action': 'set_initial_pose',
+                'use_landmark_pose': True,
+                'max_range_m': self._auto_relocalize_max_range_m,
+                'covariance_xy': self._auto_relocalize_covariance_xy,
+                'covariance_yaw': self._auto_relocalize_covariance_yaw,
+                'cooldown_sec': self._auto_relocalize_cooldown_sec,
+                'priority': self._auto_relocalize_priority,
+            }
+            try:
+                rule = self._parse_rule(len(self._rules) + len(auto_rules), raw)
+                auto_rules.append(rule)
+                self._rules_by_key[rule.key] = rule
+            except (TypeError, ValueError) as exc:
+                self.get_logger().warning(
+                    f'Failed to auto-generate relocalize rule for {family}:{tag_id}: {exc}'
+                )
+        return auto_rules
 
     def _resolve_landmarks_file_path(self) -> str:
         explicit = self._landmarks_file_param.strip()
@@ -444,6 +552,7 @@ class AprilTagNavBehaviorTreeNode(Node):
             'navigate_to_pose',
             'set_initial_pose',
             'dock_then_sleep',
+            'dock_relocalize_spin_resume',
         }
         if action not in supported_actions:
             raise ValueError(f'unsupported action "{action}"')
@@ -483,6 +592,20 @@ class AprilTagNavBehaviorTreeNode(Node):
         if sleep_duration_sec < 0.0:
             sleep_duration_sec = self._docking_sleep_duration_sec
 
+        relocalize_wait_sec = float(raw_rule.get('relocalize_wait_sec', 5.0))
+        if relocalize_wait_sec < 0.0:
+            relocalize_wait_sec = 5.0
+
+        backaway_duration_sec = float(raw_rule.get('backaway_duration_sec', 1.5))
+        if backaway_duration_sec < 0.0:
+            backaway_duration_sec = 1.5
+
+        spin_angle_deg = float(raw_rule.get('spin_angle_deg', 360.0))
+        if spin_angle_deg < 0.0:
+            spin_angle_deg = 360.0
+
+        spin_angular_z = float(raw_rule.get('spin_angular_z', 0.8))
+
         parsed_rule = TagRule(
             key=key,
             tag_id=tag_id,
@@ -509,8 +632,19 @@ class AprilTagNavBehaviorTreeNode(Node):
             pause_nav2_during_sleep=bool(
                 raw_rule.get('pause_nav2_during_sleep', self._docking_pause_nav2)
             ),
+            relocalize_wait_sec=relocalize_wait_sec,
+            backaway_duration_sec=backaway_duration_sec,
+            backaway_linear_x=float(raw_rule.get('backaway_linear_x', 0.0)),
+            spin_angle_deg=spin_angle_deg,
+            spin_angular_z=spin_angular_z,
             message=str(raw_rule.get('message', '')),
         )
+
+        if 'backaway_linear_x' not in raw_rule:
+            if abs(parsed_rule.linear_x) > 1.0e-6:
+                parsed_rule.backaway_linear_x = -parsed_rule.linear_x
+            else:
+                parsed_rule.backaway_linear_x = -self._docking_default_linear_x
 
         use_landmark_pose = bool(raw_rule.get('use_landmark_pose', False))
         x_in_rule = 'x' in raw_rule
@@ -610,6 +744,14 @@ class AprilTagNavBehaviorTreeNode(Node):
         for family_key in stale_family_keys:
             self._detections_by_family_id.pop(family_key, None)
 
+        if self._active_relocalize_maneuver is not None:
+            active_rule = self._rules_by_key.get(self._active_relocalize_maneuver.rule_key)
+            if active_rule is not None:
+                self._selected_rule = active_rule
+                self._selected_detection = self._get_detection_for_rule(active_rule)
+                return True
+            self._active_relocalize_maneuver = None
+
         if self._active_dock is not None:
             active_rule = self._rules_by_key.get(self._active_dock.rule_key)
             if active_rule is not None:
@@ -696,6 +838,8 @@ class AprilTagNavBehaviorTreeNode(Node):
             return BT_SUCCESS
         if rule.action == 'dock_then_sleep':
             return self._action_dock_then_sleep(rule)
+        if rule.action == 'dock_relocalize_spin_resume':
+            return self._action_dock_relocalize_spin_resume(rule)
 
         self.get_logger().warning(f'Unsupported action "{rule.action}" in rule "{rule.key}"')
         return BT_FAILURE
@@ -950,6 +1094,238 @@ class AprilTagNavBehaviorTreeNode(Node):
         )
         return BT_FAILURE
 
+    def _finalize_relocalize_maneuver(
+        self,
+        active: ActiveRelocalizeManeuver,
+        success: bool,
+    ) -> str:
+        active.final_status_success = success
+        self._publish_cmd_vel(0.0, 0.0)
+        if active.resume_required:
+            active.stage = RELOCALIZE_STAGE_RESUME
+            return BT_RUNNING
+
+        self._active_relocalize_maneuver = None
+        return BT_SUCCESS if success else BT_FAILURE
+
+    def _action_dock_relocalize_spin_resume(self, rule: TagRule) -> str:
+        now_ns = self.get_clock().now().nanoseconds
+        active = self._active_relocalize_maneuver
+
+        if active is None or active.rule_key != rule.key:
+            if rule.cancel_active_goal:
+                self._request_cancel_navigation(rule.key)
+
+            relocalize_wait_ns = int(rule.relocalize_wait_sec * 1.0e9)
+            backaway_duration_ns = int(rule.backaway_duration_sec * 1.0e9)
+            spin_duration_ns = 0
+            if abs(rule.spin_angular_z) > 1.0e-6:
+                spin_duration_ns = int(
+                    abs(math.radians(rule.spin_angle_deg) / rule.spin_angular_z) * 1.0e9
+                )
+
+            stage = (
+                RELOCALIZE_STAGE_PAUSE
+                if rule.pause_nav2_during_sleep
+                else RELOCALIZE_STAGE_APPROACH
+            )
+            active = ActiveRelocalizeManeuver(
+                rule_key=rule.key,
+                linear_x=rule.linear_x,
+                angular_z=rule.angular_z,
+                deadline_ns=now_ns + int(rule.dock_timeout_sec * 1.0e9),
+                dock_target_range_m=rule.dock_target_range_m,
+                relocalize_wait_ns=relocalize_wait_ns,
+                backaway_linear_x=rule.backaway_linear_x,
+                backaway_duration_ns=backaway_duration_ns,
+                spin_angular_z=rule.spin_angular_z,
+                spin_duration_ns=spin_duration_ns,
+                stage=stage,
+            )
+            self._active_relocalize_maneuver = active
+            self._mark_rule_triggered(rule)
+            self.get_logger().info(
+                f'Rule "{rule.key}" starting dock_relocalize_spin_resume '
+                f'(target_range={rule.dock_target_range_m:.2f}m, '
+                f'relocalize_wait={rule.relocalize_wait_sec:.1f}s, '
+                f'backaway={rule.backaway_duration_sec:.1f}s @ {rule.backaway_linear_x:.3f} m/s, '
+                f'spin={rule.spin_angle_deg:.1f}deg @ {rule.spin_angular_z:.3f} rad/s)'
+            )
+
+        if active.stage == RELOCALIZE_STAGE_PAUSE:
+            if active.pause_future is None:
+                active.pause_future = self._request_lifecycle_command(
+                    ManageLifecycleNodes.Request.PAUSE,
+                    f'rule "{rule.key}" starting dock_relocalize_spin_resume',
+                )
+                if active.pause_future is None:
+                    self.get_logger().warning(
+                        f'Rule "{rule.key}" could not pause lifecycle manager; '
+                        'continuing maneuver without pause.'
+                    )
+                    active.stage = RELOCALIZE_STAGE_APPROACH
+                    return BT_RUNNING
+
+            if not active.pause_future.done():
+                return BT_RUNNING
+
+            try:
+                response = active.pause_future.result()
+            except Exception as exc:  # noqa: BLE001
+                self.get_logger().warning(
+                    f'Rule "{rule.key}" pause request failed: {exc}. '
+                    'Continuing maneuver without pause.'
+                )
+            else:
+                if response is not None and not response.success:
+                    self.get_logger().warning(
+                        f'Rule "{rule.key}" lifecycle pause returned success=false. '
+                        'Continuing maneuver without pause.'
+                    )
+                else:
+                    active.resume_required = True
+                    self.get_logger().info(
+                        f'Rule "{rule.key}" paused lifecycle-managed navigation nodes.'
+                    )
+
+            active.stage = RELOCALIZE_STAGE_APPROACH
+            return BT_RUNNING
+
+        if active.stage == RELOCALIZE_STAGE_APPROACH:
+            detection = self._get_detection_for_rule(rule)
+            if detection is not None and detection.distance_m <= active.dock_target_range_m:
+                self._publish_cmd_vel(0.0, 0.0)
+                self.get_logger().info(
+                    f'Rule "{rule.key}" reached target range at {detection.distance_m:.2f}m.'
+                )
+                active.stage = RELOCALIZE_STAGE_TRIGGER
+                return BT_RUNNING
+
+            if now_ns >= active.deadline_ns:
+                self.get_logger().warning(
+                    f'Rule "{rule.key}" timed out while approaching AprilTag {rule.tag_id}.'
+                )
+                return self._finalize_relocalize_maneuver(active, success=False)
+
+            if detection is None:
+                # Keep stationary while tag is temporarily lost; retry until timeout.
+                self._publish_cmd_vel(0.0, 0.0)
+                return BT_RUNNING
+
+            self._publish_cmd_vel(active.linear_x, active.angular_z)
+            return BT_RUNNING
+
+        if active.stage == RELOCALIZE_STAGE_TRIGGER:
+            if active.reinitialize_future is None:
+                active.reinitialize_future = self._request_reinitialize_localization(
+                    context=f'rule "{rule.key}" retrigger localization',
+                )
+                if active.reinitialize_future is None:
+                    self.get_logger().warning(
+                        f'Rule "{rule.key}" could not call localization reinitialize service; '
+                        'continuing.'
+                    )
+                    active.wait_end_ns = now_ns + active.relocalize_wait_ns
+                    active.stage = RELOCALIZE_STAGE_WAIT
+                    return BT_RUNNING
+
+            if not active.reinitialize_future.done():
+                return BT_RUNNING
+
+            try:
+                active.reinitialize_future.result()
+            except Exception as exc:  # noqa: BLE001
+                self.get_logger().warning(
+                    f'Rule "{rule.key}" reinitialize localization call failed: {exc}'
+                )
+            else:
+                self.get_logger().info(
+                    f'Rule "{rule.key}" retriggered localization service.'
+                )
+
+            active.wait_end_ns = now_ns + active.relocalize_wait_ns
+            active.stage = RELOCALIZE_STAGE_WAIT
+            return BT_RUNNING
+
+        if active.stage == RELOCALIZE_STAGE_WAIT:
+            self._publish_cmd_vel(0.0, 0.0)
+            if now_ns < active.wait_end_ns:
+                return BT_RUNNING
+
+            if active.backaway_duration_ns <= 0:
+                active.stage = RELOCALIZE_STAGE_SPIN
+                active.spin_end_ns = now_ns + active.spin_duration_ns
+                return BT_RUNNING
+
+            active.backaway_end_ns = now_ns + active.backaway_duration_ns
+            active.stage = RELOCALIZE_STAGE_BACKAWAY
+            return BT_RUNNING
+
+        if active.stage == RELOCALIZE_STAGE_BACKAWAY:
+            if now_ns < active.backaway_end_ns:
+                self._publish_cmd_vel(active.backaway_linear_x, 0.0)
+                return BT_RUNNING
+
+            self._publish_cmd_vel(0.0, 0.0)
+            active.stage = RELOCALIZE_STAGE_SPIN
+            active.spin_end_ns = now_ns + active.spin_duration_ns
+            return BT_RUNNING
+
+        if active.stage == RELOCALIZE_STAGE_SPIN:
+            if active.spin_duration_ns <= 0:
+                return self._finalize_relocalize_maneuver(active, success=True)
+
+            if now_ns < active.spin_end_ns:
+                self._publish_cmd_vel(0.0, active.spin_angular_z)
+                return BT_RUNNING
+
+            return self._finalize_relocalize_maneuver(active, success=True)
+
+        if active.stage == RELOCALIZE_STAGE_RESUME:
+            self._publish_cmd_vel(0.0, 0.0)
+            if active.resume_future is None:
+                active.resume_future = self._request_lifecycle_command(
+                    ManageLifecycleNodes.Request.RESUME,
+                    f'rule "{rule.key}" finishing dock_relocalize_spin_resume',
+                )
+                if active.resume_future is None:
+                    self._active_relocalize_maneuver = None
+                    self.get_logger().warning(
+                        f'Rule "{rule.key}" could not resume lifecycle manager service.'
+                    )
+                    return BT_FAILURE
+
+            if not active.resume_future.done():
+                return BT_RUNNING
+
+            try:
+                response = active.resume_future.result()
+            except Exception as exc:  # noqa: BLE001
+                self._active_relocalize_maneuver = None
+                self.get_logger().warning(
+                    f'Rule "{rule.key}" resume request failed: {exc}.'
+                )
+                return BT_FAILURE
+
+            if response is not None and not response.success:
+                self._active_relocalize_maneuver = None
+                self.get_logger().warning(
+                    f'Rule "{rule.key}" lifecycle resume returned success=false.'
+                )
+                return BT_FAILURE
+
+            self.get_logger().info(
+                f'Rule "{rule.key}" resumed lifecycle-managed navigation nodes.'
+            )
+            self._active_relocalize_maneuver = None
+            return BT_SUCCESS if active.final_status_success else BT_FAILURE
+
+        self._active_relocalize_maneuver = None
+        self.get_logger().warning(
+            f'Rule "{rule.key}" entered unknown relocalize stage "{active.stage}".'
+        )
+        return BT_FAILURE
+
     def _request_lifecycle_command(
         self,
         command: int,
@@ -965,6 +1341,17 @@ class AprilTagNavBehaviorTreeNode(Node):
         request = ManageLifecycleNodes.Request()
         request.command = command
         return self._lifecycle_manager_client.call_async(request)
+
+    def _request_reinitialize_localization(self, context: str) -> Optional[Future]:
+        if not self._reinitialize_localization_client.service_is_ready():
+            self.get_logger().warning(
+                f'Localization reinitialize service not ready: '
+                f'{self._reinitialize_localization_service} ({context})'
+            )
+            return None
+
+        request = Empty.Request()
+        return self._reinitialize_localization_client.call_async(request)
 
     def _request_lidar_motor(self, start: bool, context: str) -> Optional[Future]:
         client = self._lidar_start_client if start else self._lidar_stop_client

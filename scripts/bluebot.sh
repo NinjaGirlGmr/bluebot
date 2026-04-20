@@ -14,11 +14,11 @@ MAP_FREE_THRESH="${MAP_FREE_THRESH:-0.25}"
 MAP_IMAGE_FORMAT="${MAP_IMAGE_FORMAT:-pgm}"
 APRILTAG_LANDMARKS_FILE="${APRILTAG_LANDMARKS_FILE:-/tmp/apriltag_map_landmarks.yaml}"
 APRILTAG_LANDMARKS_SAVE_ENABLED="${APRILTAG_LANDMARKS_SAVE_ENABLED:-true}"
-LIDAR_SCAN_FREQUENCY="${LIDAR_SCAN_FREQUENCY:-6.0}"
+LIDAR_SCAN_FREQUENCY="${LIDAR_SCAN_FREQUENCY:-8.0}"
 LIDAR_ANGLE_COMPENSATE="${LIDAR_ANGLE_COMPENSATE:-false}"
 LIDAR_SCAN_MODE="${LIDAR_SCAN_MODE:-}"
 BRIDGE_STALL_COMPENSATION_ENABLED="${BRIDGE_STALL_COMPENSATION_ENABLED:-true}"
-BRIDGE_MIN_EFFECTIVE_LINEAR_MPS="${BRIDGE_MIN_EFFECTIVE_LINEAR_MPS:-0.14}"
+BRIDGE_MIN_EFFECTIVE_LINEAR_MPS="${BRIDGE_MIN_EFFECTIVE_LINEAR_MPS:-0.08}"
 BRIDGE_MIN_EFFECTIVE_ANGULAR_RAD_S="${BRIDGE_MIN_EFFECTIVE_ANGULAR_RAD_S:-0.0}"
 BRIDGE_ZERO_CMD_EPSILON="${BRIDGE_ZERO_CMD_EPSILON:-0.0001}"
 NAV2_USE_SIM_TIME="${NAV2_USE_SIM_TIME:-false}"
@@ -73,10 +73,14 @@ ISAAC_GRID_LOCALIZER_LAUNCH_FILE="${ISAAC_GRID_LOCALIZER_LAUNCH_FILE:-isaac_grid
 ISAAC_GRID_LOCALIZER_SCAN_TOPIC="${ISAAC_GRID_LOCALIZER_SCAN_TOPIC:-/scan}"
 ISAAC_GRID_LOCALIZER_FLATSCAN_TOPIC="${ISAAC_GRID_LOCALIZER_FLATSCAN_TOPIC:-/flatscan}"
 ISAAC_GRID_LOCALIZER_RESULT_TOPIC="${ISAAC_GRID_LOCALIZER_RESULT_TOPIC:-/localization_result}"
+ISAAC_GRID_LOCALIZER_SET_POSE_TOPIC="${ISAAC_GRID_LOCALIZER_SET_POSE_TOPIC:-/set_pose_global}"
+ISAAC_GRID_LOCALIZER_USE_CURRENT_OUTPUT_STAMP="${ISAAC_GRID_LOCALIZER_USE_CURRENT_OUTPUT_STAMP:-false}"
 ISAAC_GRID_LOCALIZER_TRIGGER_SERVICE="${ISAAC_GRID_LOCALIZER_TRIGGER_SERVICE:-/trigger_grid_search_localization}"
-ISAAC_GRID_LOCALIZER_TRIGGER_RETRIES="${ISAAC_GRID_LOCALIZER_TRIGGER_RETRIES:-12}"
+ISAAC_GRID_LOCALIZER_TRIGGER_RETRIES="${ISAAC_GRID_LOCALIZER_TRIGGER_RETRIES:-120}"
 ISAAC_GRID_LOCALIZER_TRIGGER_WAIT_SEC="${ISAAC_GRID_LOCALIZER_TRIGGER_WAIT_SEC:-1}"
-ISAAC_GRID_LOCALIZER_FALLBACK_INITIAL_POSE_ENABLED="${ISAAC_GRID_LOCALIZER_FALLBACK_INITIAL_POSE_ENABLED:-true}"
+ISAAC_GRID_LOCALIZER_TRIGGER_CALL_TIMEOUT_SEC="${ISAAC_GRID_LOCALIZER_TRIGGER_CALL_TIMEOUT_SEC:-3}"
+ISAAC_GRID_LOCALIZER_RESULT_WAIT_SEC="${ISAAC_GRID_LOCALIZER_RESULT_WAIT_SEC:-6}"
+ISAAC_GRID_LOCALIZER_FALLBACK_INITIAL_POSE_ENABLED="${ISAAC_GRID_LOCALIZER_FALLBACK_INITIAL_POSE_ENABLED:-false}"
 ISAAC_GRID_LOCALIZER_FALLBACK_INITIAL_POSE_WAIT_SEC="${ISAAC_GRID_LOCALIZER_FALLBACK_INITIAL_POSE_WAIT_SEC:-6.0}"
 ISAAC_GRID_LOCALIZER_FALLBACK_INITIAL_POSE_PUBLISH_COUNT="${ISAAC_GRID_LOCALIZER_FALLBACK_INITIAL_POSE_PUBLISH_COUNT:-5}"
 ISAAC_GRID_LOCALIZER_FALLBACK_INITIAL_POSE_PUBLISH_PERIOD_SEC="${ISAAC_GRID_LOCALIZER_FALLBACK_INITIAL_POSE_PUBLISH_PERIOD_SEC:-0.5}"
@@ -852,20 +856,35 @@ prepare_isaac_localizer_map_yaml() {
 
 trigger_grid_localization() {
   local service_name="${1:-$ISAAC_GRID_LOCALIZER_TRIGGER_SERVICE}"
+  local result_topic="${2:-$ISAAC_GRID_LOCALIZER_RESULT_TOPIC}"
   local retries="$ISAAC_GRID_LOCALIZER_TRIGGER_RETRIES"
   local wait_sec="$ISAAC_GRID_LOCALIZER_TRIGGER_WAIT_SEC"
+  local call_timeout_sec="$ISAAC_GRID_LOCALIZER_TRIGGER_CALL_TIMEOUT_SEC"
+  local result_wait_sec="$ISAAC_GRID_LOCALIZER_RESULT_WAIT_SEC"
   local attempt
+  local service_list
 
   for ((attempt = 1; attempt <= retries; attempt++)); do
-    if timeout 3s ros2 service call "$service_name" std_srvs/srv/Empty "{}" \
-      >/dev/null 2>&1; then
-      echo "Triggered Isaac grid localization via ${service_name}."
-      return 0
+    service_list="$(timeout 2s ros2 service list 2>/dev/null || true)"
+    if grep -Fxq "$service_name" <<< "$service_list"; then
+      if timeout "${call_timeout_sec}s" ros2 service call "$service_name" std_srvs/srv/Empty "{}" \
+        >/dev/null 2>&1; then
+        echo "Triggered Isaac grid localization via ${service_name} (attempt ${attempt}/${retries}); waiting for ${result_topic}..."
+        if timeout "${result_wait_sec}s" ros2 topic echo "$result_topic" --once \
+          >/dev/null 2>&1; then
+          echo "Received localization result on ${result_topic}."
+          return 0
+        fi
+        echo "No localization result on ${result_topic} within ${result_wait_sec}s; retrying trigger."
+      fi
+    fi
+    if (( attempt == 1 || attempt % 5 == 0 )); then
+      echo "Waiting for Isaac grid localization trigger service '${service_name}' (attempt ${attempt}/${retries})..."
     fi
     sleep "$wait_sec"
   done
 
-  echo "Warning: failed to trigger Isaac grid localization service '${service_name}'."
+  echo "Warning: failed to trigger Isaac grid localization service '${service_name}' with result topic '${result_topic}'."
   echo "Initial pose may need manual publication on /initialpose."
   return 1
 }
@@ -908,6 +927,8 @@ start_nav() {
           pose_with_covariance_topic:="$ISAAC_GRID_LOCALIZER_RESULT_TOPIC" \
           output_topic:=/initialpose \
           output_frame_id:=map \
+          set_pose_topic:="$ISAAC_GRID_LOCALIZER_SET_POSE_TOPIC" \
+          use_current_output_stamp:="$ISAAC_GRID_LOCALIZER_USE_CURRENT_OUTPUT_STAMP" \
           fallback_initial_pose_enabled:="$ISAAC_GRID_LOCALIZER_FALLBACK_INITIAL_POSE_ENABLED" \
           fallback_initial_pose_wait_sec:="$ISAAC_GRID_LOCALIZER_FALLBACK_INITIAL_POSE_WAIT_SEC" \
           fallback_initial_pose_publish_count:="$ISAAC_GRID_LOCALIZER_FALLBACK_INITIAL_POSE_PUBLISH_COUNT" \
@@ -917,7 +938,9 @@ start_nav() {
           fallback_initial_pose_yaw:="$ISAAC_GRID_LOCALIZER_FALLBACK_INITIAL_POSE_YAW"
       isaac_localizer_started=1
       sleep 2
-      trigger_grid_localization "$ISAAC_GRID_LOCALIZER_TRIGGER_SERVICE" || true
+      trigger_grid_localization \
+        "$ISAAC_GRID_LOCALIZER_TRIGGER_SERVICE" \
+        "$ISAAC_GRID_LOCALIZER_RESULT_TOPIC" || true
     fi
   fi
 

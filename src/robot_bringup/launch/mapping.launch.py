@@ -289,9 +289,9 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument('serial_odom_topic', default_value='/odom_raw'),
         DeclareLaunchArgument('serial_publish_tf', default_value='false'),
         DeclareLaunchArgument('serial_enable_stall_compensation', default_value='true'),
-        DeclareLaunchArgument('serial_min_effective_linear_mps', default_value='0.14'),
-        DeclareLaunchArgument('serial_min_effective_angular_rad_s', default_value='0.25'),
-        DeclareLaunchArgument('serial_min_effective_turn_wheel_mps', default_value='0.10'),
+        DeclareLaunchArgument('serial_min_effective_linear_mps', default_value='0.28'),
+        DeclareLaunchArgument('serial_min_effective_angular_rad_s', default_value='0.22'),
+        DeclareLaunchArgument('serial_min_effective_turn_wheel_mps', default_value='0.18'),
         DeclareLaunchArgument('serial_zero_cmd_epsilon', default_value='0.0001'),
         DeclareLaunchArgument(
             'state_estimation_params_file',
@@ -342,7 +342,7 @@ def generate_launch_description() -> LaunchDescription:
             ),
         ),
         DeclareLaunchArgument('apriltag_realsense_enabled', default_value='false'),
-        DeclareLaunchArgument('apriltag_map_recorder_enabled', default_value='false'),
+        DeclareLaunchArgument('apriltag_map_recorder_enabled', default_value='true'),
         DeclareLaunchArgument(
             'apriltag_map_recorder_params_file',
             default_value=PathJoinSubstitution(
