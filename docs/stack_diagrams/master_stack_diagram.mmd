@@ -76,6 +76,21 @@ GLOBAL_EKF --> NAV2_STACK
 AT_CAM --> AT_LOC
 AT_BT --> NAV2_STACK
 
+%% ---------- DOCKING (NAVIGATION BRANCH) ----------
+DOCK_DET["dock_detector_node\n/tag_detections -> /detected_dock_pose"]:::apriltag
+DOCK_CMD["dock_command_node\n/dock_command topic -> docking action"]:::apriltag
+DOCK_SRV["opennav_docking server\n(SimpleChargingDock)"]:::apriltag
+GOAL_SAN["goal_pose_sanitizer_node\n/goal_pose -> map frame + fresh stamp"]:::apriltag
+
+NAV_LAUNCH --> DOCK_DET
+NAV_LAUNCH --> DOCK_CMD
+NAV_LAUNCH --> DOCK_SRV
+NAV_LAUNCH --> GOAL_SAN
+AT_CAM --> DOCK_DET
+DOCK_DET --> DOCK_SRV
+DOCK_CMD --> DOCK_SRV
+GOAL_SAN --> NAV2_STACK
+
 %% ---------- NOTE ----------
 NOTE["Legacy packages bluebot_v2 / bluebot_v3 are removed.\nstraight_line_compensator_node now lives in robot_bringup."]:::artifacts
 ENTRY --- NOTE

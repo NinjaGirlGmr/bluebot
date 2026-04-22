@@ -8,6 +8,7 @@ classDef nav2 fill:#f8d7da,stroke:#dc3545,stroke-width:1px,color:#000;
 classDef state fill:#f0f0f0,stroke:#6c757d,stroke-width:1px,color:#000;
 classDef apriltag fill:#fff3cd,stroke:#ff9800,stroke-width:1px,color:#000;
 classDef ops fill:#efe8ff,stroke:#6f42c1,stroke-width:1px,color:#000;
+classDef docking fill:#fde8ff,stroke:#9c27b0,stroke-width:1px,color:#000;
 
 %% ---------- ENTRYPOINT ----------
 A["bluebot_bringup.sh start navigation {map}"]:::startup
@@ -35,6 +36,14 @@ AT2["apriltag_map_localization\n/tag_detections + TF + landmarks -> /apriltag/ma
 AT3["isaac_grid_localization_to_nav2 (default enabled)\n/localization_result -> /initialpose"]:::apriltag
 AT4["apriltag_nav_behavior_tree\nrules + landmarks + map actions"]:::apriltag
 
+%% ---------- DOCKING ----------
+DK1["dock_detector_node\n/tag_detections -> /detected_dock_pose"]:::apriltag
+DK2["dock_command_node\n/dock_command -> opennav_docking action"]:::ops
+DK3["opennav_docking server\n(SimpleChargingDock, use_external_detection_pose)"]:::ops
+
+%% ---------- GOAL HANDLING ----------
+GS["goal_pose_sanitizer_node\nrewrites /goal_pose -> map frame + fresh stamp"]:::state
+
 %% ---------- FLOW ----------
 A --> B
 
@@ -45,6 +54,10 @@ B -->|starts| AT1
 B -->|starts| AT2
 B -->|default enabled| AT3
 B -->|default enabled| AT4
+B -->|starts| DK1
+B -->|starts| DK2
+B -->|starts| DK3
+B -->|starts| GS
 
 N1 -->|/odom_raw| N2
 N4 -->|/cmd_vel_compensated| N1
@@ -54,6 +67,7 @@ N5 --> N6
 N6 --> N7
 
 AT0 -->|/tag_detections| AT2
+AT0 -->|/tag_detections| DK1
 AT1 -->|map landmark TFs| AT2
 AT2 -->|pose0=/apriltag/map_pose| N3
 AT3 -->|pose1=/initialpose| N3
@@ -62,3 +76,8 @@ AT3 -->|/initialpose| N7
 N3 -->|map->odom TF| N7
 AT4 -->|may publish /initialpose or nav actions| N7
 N8 --> N6
+
+DK1 -->|/detected_dock_pose| DK3
+DK2 -->|dock action| DK3
+
+GS -->|sanitized /goal_pose| N7
