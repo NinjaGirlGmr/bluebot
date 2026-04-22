@@ -33,7 +33,9 @@ FIRST is a great environment for collaborative development and creative problem 
 
 It's also been a two-way exchange. Things I learned building Bluebot — particularly around vision-based perception and robot localization — I was able to bring back to our competition robot and apply directly. That feedback loop between personal exploration and team work has been one of the most valuable parts of the project.
 
-More broadly, I started Bluebot because I wanted more than a theoretical understanding of autonomous systems — I wanted to build one end to end. The goal from the beginning was a project that touched every layer of the problem: selecting and integrating hardware, designing the physical structure, wiring sensors into a software stack, and implementing the algorithms that make a robot capable of understanding and acting in its environment. Robotics is uniquely demanding in that way, and that's exactly what drew me to it.
+Bluebot also built directly on lessons from my first self-built robot, *Le Roomba* — a differential drive platform cannibalized from a robotic vacuum. Le Roomba was purely teleoperated with a simple collision avoidance function, no autonomous navigation. It was a great first build, but its real value was as a springboard: it showed me what I didn't yet know and made clear exactly what I wanted to tackle next.
+
+I started Bluebot because I wanted more than a theoretical understanding of autonomous systems — I wanted to build one end to end. The goal from the beginning was a project that touched every layer of the problem: selecting and integrating hardware, designing the physical structure, wiring sensors into a software stack, and implementing the algorithms that make a robot capable of understanding and acting in its environment. Robotics is uniquely demanding in that way, and that's exactly what drew me to it.
 
 ### What I Set Out to Build
 
