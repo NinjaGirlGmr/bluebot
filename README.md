@@ -7,9 +7,25 @@
   </tr></table>
 </div>
 
-Main ROS 2 Humble workspace for Bluebot bringup, mapping, navigation, and hardware integration.
+## Introduction
+
+Bluebot is a personal autonomous mobile robot project built from the ground up on **ROS 2 Humble**, running on a **NVIDIA Jetson Orin Nano**. The goal was to build a fully self-contained indoor navigation platform — from hardware integration through sensor fusion, mapping, and autonomous goal-seeking — using the same tools and frameworks used in professional and research robotics.
+
+The robot integrates a **Slamtec A2R8 LiDAR**, **Intel RealSense D435** depth camera, **Yahboom A471 10-axis IMU**, and an **Arduino Nano** motor controller into a unified ROS 2 stack. Navigation is built on **Nav2** with a multi-sensor localization pipeline: wheel odometry fused with IMU via `robot_localization` EKF, **AprilTag**-based global pose correction via a secondary EKF, and **Isaac ROS occupancy-grid localization** for initial pose estimation. Maps are built using **SLAM Toolbox** and annotated with AprilTag landmarks for repeatable localization across sessions.
+
+Key areas of custom development include:
+
+- **AprilTag landmark pipeline** — recording, static TF publishing, and map-frame pose estimation nodes written in Python, integrated with the Nav2 localization graph
+- **Custom Nav2 Behavior Tree plugin** (C++) — rule-based BT node for AprilTag-triggered actions including docking, relocalizing, and navigation
+- **Autonomous docking** — `opennav_docking` integration with a custom detector node bridging AprilTag detections to the docking server
+- **Straight-line drift compensation** — PID yaw-correction node to counteract drivetrain asymmetry on open-loop straight drives
+- **Foxglove** telemetry, custom panel extension, and layout files for real-time visualization and remote operation
+
+This repository is the full ROS 2 workspace — all bringup launch files, configuration, custom nodes, and runtime scripts are here.
 
 ## Current Runtime State
+
+Main ROS 2 Humble workspace for Bluebot bringup, mapping, navigation, and hardware integration.
 
 The active runtime stack is centered on `robot_bringup`.
 
