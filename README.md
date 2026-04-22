@@ -23,6 +23,26 @@ Key areas of custom development include:
 
 This repository is the full ROS 2 workspace — all bringup launch files, configuration, custom nodes, and runtime scripts are here.
 
+## Goals
+
+### Why This Project
+
+I started Bluebot because I wanted more than a theoretical understanding of autonomous systems — I wanted to build one. The goal from the beginning was a project that touched every layer of the problem: selecting and integrating hardware, designing the physical structure, wiring sensors into a software stack, and implementing the algorithms that make a robot capable of understanding and acting in its environment. Robotics is uniquely demanding in that way, and that's exactly what drew me to it.
+
+### What I Set Out to Build
+
+The initial technical goal was straightforward: a robot that could map an unknown environment using sensor data and then navigate it autonomously. Getting there required working through localization, sensor fusion, motion control, and path planning — none of which are simple in practice.
+
+Along the way I explored Visual SLAM as a localization strategy, but after working through the implementation decided it was more infrastructure than the project needed. That decision led to something more interesting: using what I had learned about perception to instead detect AprilTag landmarks during mapping and register them as fixed reference points for navigation. Rather than relying on dense visual features, the robot builds a sparse semantic map it can re-localize against reliably. That pivot taught me more about the real engineering tradeoffs in perception than following the original plan would have.
+
+From there the scope grew naturally — reliable localization raised the question of what the robot should actually *do* once it knew where it was, which led to behavior trees, goal management, and ultimately autonomous docking.
+
+### Where It's Going
+
+The near-term focus is continued navigation tuning and developing richer behavior trees that allow the robot to handle goals in dynamic, changing environments — not just static ones it has seen before.
+
+Longer term, I want to explore autonomous exploration: giving the robot the ability to extend its own map into unmapped frontiers without teleop, blending navigation and mapping into a single continuous capability. I'm also interested in dynamic system management — having the robot start and stop compute-intensive services based on what it's currently doing, which is both a practical constraint on the Jetson and an interesting systems design problem in its own right.
+
 ## Current Runtime State
 
 Main ROS 2 Humble workspace for Bluebot bringup, mapping, navigation, and hardware integration.
