@@ -135,8 +135,7 @@ Preferred script for `robot_bringup` modes:
 ```
 
 Full `bluebot_bringup.sh` command/function reference:
-
-- `scripts/README_bluebot_bringup.md`
+- [`scripts/README_bluebot_bringup.md`](scripts/README_bluebot_bringup.md)
 
 ## `bluebot_bringup.sh` Quick Reference
 
@@ -164,7 +163,7 @@ Mode list:
 
 Full command, argument, environment-variable, and function-level docs:
 
-- `scripts/README_bluebot_bringup.md`
+- [`scripts/README_bluebot_bringup.md`](scripts/README_bluebot_bringup.md)
 
 Direct launch usage:
 
@@ -241,8 +240,9 @@ Legacy packages `bluebot_v2` and `bluebot_v3` were removed from this workspace.
 
 ## Related Documentation
 
-- `src/robot_bringup/README.md`: full package-level launch/config reference.
-- `scripts/README_bluebot_bringup.md`: full `bluebot_bringup.sh` command/function/arg reference.
-- `scripts/README_bluebot_nav.md`: Foxglove-first nav helper workflow.
-- `docs/PARAMETERS.md`: project parameter overrides.
-- `docs/stack_diagrams/README.md`: architecture diagrams.
+- [`src/robot_bringup/README.md`](src/robot_bringup/README.md): full package-level launch/config reference.
+- [`scripts/README_bluebot_bringup.md`](`scripts/README_bluebot_bringup.md`): full `bluebot_bringup.sh` command/function/arg reference.
+- [`scripts/README_bluebot_nav.md`](`scripts/README_bluebot_nav.md`): Foxglove-first nav helper workflow.
+- [`docs/PARAMETERS.md`](`docs/PARAMETERS.md`): project parameter overrides.
+- [`docs/stack_diagrams/README.md`](`docs/stack_diagrams/README.md`): architecture diagrams.
+- [`docs/electrical/power_distribution.md`](docs/electrical/power_distribution.md): power distribution design.
