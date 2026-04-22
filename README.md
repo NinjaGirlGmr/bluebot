@@ -1,6 +1,9 @@
-# Bluebot ROS 2 Workspace
+# Bluebot
 
-<img width="1512" height="2016" alt="IMG_5673" src="https://github.com/user-attachments/assets/7a28949f-eb91-4703-aa26-80fc5caea16e" /><img width="1512" height="2016" alt="IMG_5674" src="https://github.com/user-attachments/assets/98038e4b-68a5-4cc1-9ce0-097e8eb675c4" />
+<p align="center">
+  <img width="252" height="336" alt="IMG_5673" src="https://github.com/user-attachments/assets/7a28949f-eb91-4703-aa26-80fc5caea16e">
+  <img width="252" height="336" alt="IMG_5674" src="https://github.com/user-attachments/assets/98038e4b-68a5-4cc1-9ce0-097e8eb675c4">
+</p>
 
 Main ROS 2 Humble workspace for Bluebot bringup, mapping, navigation, and hardware integration.
 
