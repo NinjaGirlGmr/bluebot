@@ -27,7 +27,13 @@ This repository is the full ROS 2 workspace — all bringup launch files, config
 
 ### Why This Project
 
-I started Bluebot because I wanted more than a theoretical understanding of autonomous systems — I wanted to build one. The goal from the beginning was a project that touched every layer of the problem: selecting and integrating hardware, designing the physical structure, wiring sensors into a software stack, and implementing the algorithms that make a robot capable of understanding and acting in its environment. Robotics is uniquely demanding in that way, and that's exactly what drew me to it.
+I've been interested in coding since middle school, starting with building my own games. In high school that interest found a new direction when I joined my school's FIRST Robotics team as a programmer. Working on a competition robot gave me my first real exposure to semi-autonomous systems — building software to achieve specific, defined objectives under real hardware constraints — and I was immediately drawn to the problem space.
+
+FIRST is a great environment for collaborative development and creative problem solving, but competition goals are predefined and the season is fixed. I wanted the freedom to set my own objectives, explore directions I hadn't planned for, and iterate without a deadline. Bluebot was the answer to that. It gave me a platform where I could decide what "success" meant and keep redefining it as I learned more.
+
+It's also been a two-way exchange. Things I learned building Bluebot — particularly around vision-based perception and robot localization — I was able to bring back to our competition robot and apply directly. That feedback loop between personal exploration and team work has been one of the most valuable parts of the project.
+
+More broadly, I started Bluebot because I wanted more than a theoretical understanding of autonomous systems — I wanted to build one end to end. The goal from the beginning was a project that touched every layer of the problem: selecting and integrating hardware, designing the physical structure, wiring sensors into a software stack, and implementing the algorithms that make a robot capable of understanding and acting in its environment. Robotics is uniquely demanding in that way, and that's exactly what drew me to it.
 
 ### What I Set Out to Build
 
@@ -73,6 +79,8 @@ The active runtime stack is centered on `robot_bringup`.
 - Slamtec A2R8 LiDAR
 - Intel RealSense D435
 - Yahboom A471 10-axis IMU
+- 2x BTS7960 H-Bridge
+- 2x DC 12v Encoder Gear Motor
 
 ## Prerequisites
 
