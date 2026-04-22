@@ -62,7 +62,7 @@ The active runtime stack is centered on `robot_bringup`.
 
 - `src/`: ROS 2 packages and submodules (Isaac ROS, RealSense, lidar, navigation, hardware drivers, bringup).
 - `scripts/`: runtime helper scripts.
-- `foxglove/`: layouts and custom panel extension.
+- `docks_db`: docks_database yaml
 - `3d_stl/`: printable robot part models.
 - `docs/`: parameter notes and stack diagrams.
 
