@@ -79,12 +79,23 @@ Sources:
 | `amcl.tf_broadcast` | `false` | Disables AMCL TF ownership so global EKF owns `map -> odom`. |
 | `controller_server.controller_frequency` | `10.0` | Main local-control loop frequency. |
 | `controller_server.progress_checker.required_movement_radius` | `0.15` | Minimum displacement considered progress. |
-| `controller_server.progress_checker.movement_time_allowance` | `20.0` | Allowed time window to make progress before failure. |
-| `controller_server.FollowPath.max_vel_x` | `0.26` | Max forward speed. |
-| `controller_server.FollowPath.max_speed_xy` | `0.26` | Max planar translational speed. |
-| `controller_server.FollowPath.trans_stopped_velocity` | `0.25` | Velocity threshold treated as stopped by controller logic. |
+| `controller_server.progress_checker.movement_time_allowance` | `10.0` | Allowed time window to make progress before failure. |
+| `controller_server.FollowPath.plugin` | `nav2_rotation_shim_controller::RotationShimController` | Wraps DWB; rotates robot in-place to face the path before handing off to primary controller. |
+| `controller_server.FollowPath.primary_controller` | `dwb_core::DWBLocalPlanner` | Underlying path-following controller used once heading is aligned. |
+| `controller_server.FollowPath.angular_dist_threshold` | `0.785` | Heading error (rad) above which the shim rotates before driving (~45°). |
+| `controller_server.FollowPath.rotate_to_heading_angular_vel` | `0.8` | Max angular velocity during shim in-place rotation. |
+| `controller_server.FollowPath.max_angular_accel` | `2.0` | Angular acceleration limit during shim rotation; matched to DWB `acc_lim_theta`. |
+| `controller_server.FollowPath.rotate_to_goal_heading` | `false` | Final goal rotation left to DWB `RotateToGoal` critic rather than shim. |
+| `controller_server.FollowPath.max_vel_x` | `0.16` | Max forward speed (DWB). |
+| `controller_server.FollowPath.max_speed_xy` | `0.16` | Max planar translational speed (DWB). |
+| `controller_server.FollowPath.trans_stopped_velocity` | `0.03` | Velocity threshold treated as stopped by controller logic. |
 | `smoother_server.smoother_plugins` | `['simple_smoother']` | Enables Nav2 path smoothing server plugin. |
 | `smoother_server.simple_smoother.max_its` | `1000` | Iterations for smoothing convergence. |
+| `global_costmap.plugins` | `["static_layer", "obstacle_layer", "inflation_layer"]` | Adds live obstacle layer so global planner routes around dynamic obstacles seen by LiDAR. |
+| `global_costmap.obstacle_layer.plugin` | `nav2_costmap_2d::ObstacleLayer` | 2D obstacle layer (vs VoxelLayer); sufficient for global planning and lower CPU cost. |
+| `global_costmap.obstacle_layer.scan.topic` | `/scan` | LiDAR source for global obstacle marking/clearing. |
+| `global_costmap.obstacle_layer.scan.obstacle_max_range` | `3.0` | Marks obstacles up to 3 m; matched to local costmap voxel_layer. |
+| `global_costmap.obstacle_layer.scan.raytrace_max_range` | `3.5` | Clears free space up to 3.5 m; matched to local costmap voxel_layer. |
 
 ### AprilTag Mapping + Localization
 
@@ -129,7 +140,7 @@ Sources:
 | `apriltag_realsense_enabled` | `false` | Leaves camera/tag detector pipeline off unless explicitly enabled. |
 | `apriltag_map_recorder_enabled` | `true` | Enables mapping recorder by default (can be disabled per launch). |
 
-## Optional / Legacy Stack (Used by `bluebot.sh` Map-Explore Flows)
+## Optional / Legacy: Map-Explore Parameters
 
 ### Explore Lite (`m-explore-ros2`)
 

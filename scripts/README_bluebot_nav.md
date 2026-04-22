@@ -25,7 +25,7 @@ Navigation wrapper for saved-map Nav2 operation with Foxglove-first workflow.
 - `maps` lists available saved maps in `/ssd/maps`.
 - `foxglove` prints websocket URL, layout path, and nav topic references.
 - `goal <x> <y> [yaw_deg]` publishes a single `PoseStamped` goal on `/goal_pose`.
-- `waypoints [name ...]` forwards to `bluebot.sh send-waypoints` for multi-goal navigation.
+- `waypoints [name ...]` publishes saved waypoints from `/ssd/maps/waypoints.yaml` to the waypoint follower topic.
 
 ## Foxglove Goal Workflow
 
@@ -120,7 +120,6 @@ Send selected waypoints only:
 
 - `NAV_UI` (default `foxglove`, options: `foxglove|rviz|none`)
 - `MAP_DIR` (default `/ssd/maps`)
-- `BLUEBOT_SCRIPT` (default `/ssd/ros2_ws/scripts/bluebot.sh`)
 - `FOXGLOVE_LAYOUT` (default `/ssd/ros2_ws/foxglove/bluebot_nav_layout.json`)
 - `FOXGLOVE_BT_LAYOUT` (default `/ssd/ros2_ws/foxglove/bluebot_nav_bt_layout.json`)
 - `FOXGLOVE_EXTENSION_DIR` (default `/ssd/ros2_ws/foxglove/bluebot_nav2_extension`)

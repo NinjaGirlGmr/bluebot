@@ -1,8 +1,8 @@
 # Bluebot ROS2 Stack Flow
 
 This diagram is derived from:
-- `/ssd/ros2_ws/scripts/bluebot.sh`
-- `/ssd/ros2_ws/src/*` launch/config/node files used by `bluebot.sh`
+- `/ssd/ros2_ws/scripts/bluebot_bringup.sh`
+- `/ssd/ros2_ws/src/*` launch/config/node files used by `bluebot_bringup.sh`
 
 ## 1) Mode Matrix
 
@@ -338,14 +338,14 @@ classDef topics fill:#fff3cd,stroke:#ffc107,stroke-width:1px,color:#000;
 TF["/tf map→base_link"]:::tf
 
 %% ---------- WAYPOINT CAPTURE ----------
-Capture["bluebot.sh capture-waypoint"]:::capture
+Capture["capture-waypoint"]:::capture
 YAML["/ssd/maps/waypoints.yaml"]:::fileops
-Send["bluebot.sh send-waypoints"]:::capture
+Send["Foxglove Nav2 Controls panel"]:::capture
 PoseArray["/foxglove/waypoints"]:::topics
 
 %% ---------- MAP SAVE ----------
 Map["/map"]:::topics
-SaveMap["bluebot.sh save-map"]:::capture
+SaveMap["bluebot_bringup.sh save-map"]:::capture
 MapFiles["/ssd/maps/<name>.yaml + .pgm"]:::fileops
 
 %% ---------- DATA FLOW ----------
@@ -364,5 +364,5 @@ SaveMap -->|map files| MapFiles
 - `map -> odom` in mapping: `slam_toolbox`
 - `map -> odom` in navigation: `AMCL` (Nav2)
 - `base_link -> laser`: `lidar_with_tf.launch.py` static TF
-- `base_link -> camera_link`: `bluebot.sh` static TF
+- `base_link -> camera_link`: `apriltag_realsense.launch.py` static TF
 - `isaac_ros_visual_slam` is configured with `publish_odom_to_base_tf=false` and `publish_map_to_odom_tf=false` to avoid TF conflicts.

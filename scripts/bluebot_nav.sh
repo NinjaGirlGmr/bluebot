@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROS_WS="${ROS_WS:-/ssd/ros2_ws}"
-BLUEBOT_SCRIPT="${BLUEBOT_SCRIPT:-$ROS_WS/scripts/bluebot.sh}"
+BRINGUP_SCRIPT="${BRINGUP_SCRIPT:-$ROS_WS/scripts/bluebot_bringup.sh}"
 RVIZ_START_SCRIPT="${RVIZ_START_SCRIPT:-$ROS_WS/rviz/start-rviz}"
 RVIZ_CONFIG="${RVIZ_CONFIG:-$ROS_WS/rviz/my_house_nav.rviz}"
 FOXGLOVE_LAYOUT="${FOXGLOVE_LAYOUT:-$ROS_WS/foxglove/bluebot_nav_layout.json}"
@@ -29,7 +29,7 @@ usage() {
   echo "  status               Show navigation and UI status."
   echo "  maps                 List saved maps in $MAP_DIR."
   echo "  goal x y [yaw_deg]   Publish one navigation goal to /goal_pose in map frame."
-  echo "  waypoints [name ...] Send all or selected named waypoints via bluebot.sh."
+  echo "  waypoints [name ...] Publish saved waypoints to the waypoint follower."
   echo "  foxglove             Print Foxglove connection and layout info."
   echo
   echo "Environment:"
@@ -223,11 +223,9 @@ show_foxglove_info() {
 }
 
 send_waypoints() {
-  if [[ ! -x "$BLUEBOT_SCRIPT" ]]; then
-    echo "Required script not found/executable: $BLUEBOT_SCRIPT"
-    return 1
-  fi
-  "$BLUEBOT_SCRIPT" send-waypoints "$@"
+  echo "The 'waypoints' CLI command has been removed." >&2
+  echo "Use the BlueBot Nav2 Controls panel in Foxglove to publish waypoint routes." >&2
+  return 1
 }
 
 start_rviz() {
@@ -320,18 +318,13 @@ stop_rviz() {
 start_nav() {
   local map_yaml
 
-  if [[ ! -x "$BLUEBOT_SCRIPT" ]]; then
-    echo "Required script not found/executable: $BLUEBOT_SCRIPT"
-    return 1
-  fi
-
   if ! is_supported_nav_ui; then
     echo "Unsupported NAV_UI='$NAV_UI'. Use one of: foxglove, rviz, none." >&2
     return 1
   fi
 
   map_yaml="$(resolve_map_yaml "${1:-}")" || return 1
-  "$BLUEBOT_SCRIPT" start-nav "$map_yaml"
+  "$BRINGUP_SCRIPT" start navigation "$map_yaml"
 
   case "${NAV_UI,,}" in
     rviz)
@@ -355,18 +348,12 @@ start_nav() {
 }
 
 stop_nav() {
-  if [[ -x "$BLUEBOT_SCRIPT" ]]; then
-    "$BLUEBOT_SCRIPT" stop || true
-  fi
+  "$BRINGUP_SCRIPT" stop || true
   stop_rviz
 }
 
 status_nav() {
-  if [[ -x "$BLUEBOT_SCRIPT" ]]; then
-    "$BLUEBOT_SCRIPT" status || true
-  else
-    echo "Required script not found/executable: $BLUEBOT_SCRIPT"
-  fi
+  "$BRINGUP_SCRIPT" status || true
 
   echo "Navigation UI mode: ${NAV_UI,,}"
   if is_rviz_running; then

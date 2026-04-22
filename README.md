@@ -112,12 +112,6 @@ source "$ROS_WS/install/setup.bash"
 ros2 launch robot_bringup navigation.launch.py --show-args
 ```
 
-Legacy orchestration script still available for non-`robot_bringup` flows:
-
-```bash
-"$ROS_WS/scripts/bluebot.sh" --help
-```
-
 ## Mapping Workflow (SLAM + AprilTag Landmarks)
 
 Start mapping with AprilTag detection and recorder enabled:
@@ -188,7 +182,6 @@ Legacy packages `bluebot_v2` and `bluebot_v3` were removed from this workspace.
 
 - `src/robot_bringup/README.md`: full package-level launch/config reference.
 - `scripts/README_bluebot_bringup.md`: full `bluebot_bringup.sh` command/function/arg reference.
-- `scripts/README_bluebot.md`: detailed `bluebot.sh` command reference.
 - `scripts/README_bluebot_nav.md`: Foxglove-first nav helper workflow.
 - `docs/PARAMETERS.md`: project parameter overrides.
 - `docs/stack_diagrams/README.md`: architecture diagrams.

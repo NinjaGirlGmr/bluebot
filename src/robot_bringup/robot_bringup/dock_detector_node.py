@@ -16,6 +16,8 @@ Only the best (first) matching detection per frame is published.
 from geometry_msgs.msg import PoseStamped
 from isaac_ros_apriltag_interfaces.msg import AprilTagDetectionArray
 
+import math
+
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy
@@ -29,6 +31,9 @@ class DockDetectorNode(Node):
         self.declare_parameter('detected_dock_pose_topic', '/detected_dock_pose')
         self.declare_parameter('dock_tag_ids', [9, 25])
         self.declare_parameter('dock_tag_family', 'tag36h11')
+        # Minimum distance from camera to dock tag (metres). Detections closer
+        # than this are treated as zero-pose pipeline artefacts and dropped.
+        self.declare_parameter('min_detection_distance', 0.05)
 
         detections_topic = self.get_parameter(
             'detections_topic').get_parameter_value().string_value
@@ -38,6 +43,8 @@ class DockDetectorNode(Node):
             self.get_parameter('dock_tag_ids').get_parameter_value().integer_array_value)
         self._dock_tag_family = self.get_parameter(
             'dock_tag_family').get_parameter_value().string_value
+        self._min_dist = self.get_parameter(
+            'min_detection_distance').get_parameter_value().double_value
 
         qos = QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE)
         self._pub = self.create_publisher(PoseStamped, dock_pose_topic, qos)
@@ -58,6 +65,15 @@ class DockDetectorNode(Node):
             if detection.family != self._dock_tag_family:
                 continue
             if detection.id not in self._dock_tag_ids:
+                continue
+            p = detection.pose.pose.pose.position
+            dist = math.sqrt(p.x ** 2 + p.y ** 2 + p.z ** 2)
+            if dist < self._min_dist:
+                self.get_logger().warn(
+                    f'[dock_detector] Dropping zero-pose detection for tag {detection.id} '
+                    f'(dist={dist:.4f} m < min={self._min_dist} m)',
+                    throttle_duration_sec=2.0,
+                )
                 continue
             out = PoseStamped()
             out.header = detection.pose.header
