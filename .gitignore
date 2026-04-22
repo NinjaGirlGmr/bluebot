@@ -9,6 +9,9 @@ Dockerfile
 ros_entrypoint.sh
 start_stack.sh
 
+foxglove/
+rviz/
+
 # Keep only selected files under scripts/
 scripts/*
 !scripts/bluebot_nav.sh
